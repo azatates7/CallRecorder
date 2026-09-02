@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("CallRecorder.Api")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+cdbb0a361c201d29482b302723c0e371ee9ee493")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+09768c2047b05c5f0f6fe7b79b440b51fe28e435")]
 [assembly: System.Reflection.AssemblyProductAttribute("CallRecorder.Api")]
 [assembly: System.Reflection.AssemblyTitleAttribute("CallRecorder.Api")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
