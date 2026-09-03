@@ -3,3 +3,4 @@
 ################################################################################
 
 /.vs
+/backend-api/CallRecorderMobileApp.Api/bin/Debug/net10.0
