@@ -5,3 +5,4 @@
 /.vs
 /backend-api/CallRecorderMobileApp.Api/bin/Debug/net10.0
 /backend-api/CallRecorderMobileApp.Api/obj/Debug/net10.0
+/CallRecorderMobileApp.Models/obj
