@@ -2,7 +2,7 @@ using FirebaseAdmin;
 using FirebaseAdmin.Messaging;
 using Google.Apis.Auth.OAuth2;
 
-namespace CallRecorder.Api.Services;
+namespace CallRecorderMobileApp.Api.Services;
 
 public interface IFcmNotificationService
 {

@@ -1,9 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using CallRecorder.Api.Data;
-using CallRecorder.Api.Models;
+using CallRecorderMobileApp.Api.Data;
+using CallRecorderMobileApp.Api.Models;
 
-namespace CallRecorder.Api.Controllers;
+namespace CallRecorderMobileApp.Api.Controllers;
 
 [ApiController]
 [Route("api/devices")]

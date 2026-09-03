@@ -1,4 +1,4 @@
-namespace CallRecorder.Api.Services;
+namespace CallRecorderMobileApp.Api.Services;
 
 public interface IRecordingStorageService
 {

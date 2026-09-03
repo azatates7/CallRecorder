@@ -1,4 +1,4 @@
-namespace CallRecorder.Api.Models;
+namespace CallRecorderMobileApp.Api.Models;
 
 public class Device
 {

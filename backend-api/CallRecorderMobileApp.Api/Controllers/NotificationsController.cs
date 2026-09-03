@@ -1,9 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using CallRecorder.Api.Data;
-using CallRecorder.Api.Services;
+using CallRecorderMobileApp.Api.Data;
+using CallRecorderMobileApp.Api.Services;
 
-namespace CallRecorder.Api.Controllers;
+namespace CallRecorderMobileApp.Api.Controllers;
 
 public record SendNotificationRequest(string DeviceId, string Title, string Body);
 

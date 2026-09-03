@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
-using CallRecorder.Api.Models;
+using CallRecorderMobileApp.Api.Models;
 
-namespace CallRecorder.Api.Data;
+namespace CallRecorderMobileApp.Api.Data;
 
 public class AppDbContext : DbContext
 {

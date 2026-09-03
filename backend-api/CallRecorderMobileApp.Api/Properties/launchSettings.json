@@ -1,6 +1,6 @@
 {
   "profiles": {
-    "CallRecorder.Api": {
+    "CallRecorderMobileApp.Api": {
       "commandName": "Project",
       "launchBrowser": true,
       "environmentVariables": {

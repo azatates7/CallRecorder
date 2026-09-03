@@ -1,7 +1,7 @@
 using StackExchange.Redis;
 using System.Text.Json;
 
-namespace CallRecorder.Api.Services;
+namespace CallRecorderMobileApp.Api.Services;
 
 public interface IRedisCacheService
 {
@@ -31,7 +31,7 @@ public class RedisCacheService : IRedisCacheService
     {
         var json = await Db.StringGetAsync(key);
         if (json.IsNullOrEmpty) return default;
-        return JsonSerializer.Deserialize<T>(json!);
+        return JsonSerializer.Deserialize<T>((string)json);
     }
 
     public async Task RemoveAsync(string key)

@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using StackExchange.Redis;
-using CallRecorder.Api.Data;
-using CallRecorder.Api.Services;
+using CallRecorderMobileApp.Api.Data;
+using CallRecorderMobileApp.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
