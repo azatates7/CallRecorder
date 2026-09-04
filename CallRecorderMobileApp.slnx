@@ -44,15 +44,16 @@
     <File Path="CallRecordingService.kt" />
     <File Path="PhoneStateReceiver.kt" />
   </Folder>
-  <Folder Name="/frontend/android/app/src/native/">
-    <File Path="CallRecorder.ts" />
-  </Folder>
   <Folder Name="/frontend/android/gradle/" />
   <Folder Name="/frontend/android/gradle/wrapper/">
     <File Path="frontend/android/gradle/wrapper/gradle-wrapper.jar" />
     <File Path="frontend/android/gradle/wrapper/gradle-wrapper.properties" />
   </Folder>
   <Folder Name="/frontend/ios/" />
+  <Folder Name="/frontend/src/" />
+  <Folder Name="/frontend/src/native/">
+    <File Path="CallRecorder.ts" />
+  </Folder>
   <Project Path="CallRecorderMobileApp.Api/CallRecorderMobileApp.Api.csproj" />
   <Project Path="CallRecorderMobileApp.Models/CallRecorderMobileApp.Models.csproj" Id="1ace283d-32ee-466a-a9bc-e367802ea095" />
 </Solution>
