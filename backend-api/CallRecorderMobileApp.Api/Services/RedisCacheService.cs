@@ -31,7 +31,7 @@ public class RedisCacheService : IRedisCacheService
     {
         var json = await Db.StringGetAsync(key);
         if (json.IsNullOrEmpty) return default;
-        return JsonSerializer.Deserialize<T>((string)json);
+        return JsonSerializer.Deserialize<T>(json.ToString());
     }
 
     public async Task RemoveAsync(string key)
