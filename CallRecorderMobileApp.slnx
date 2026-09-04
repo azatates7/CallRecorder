@@ -1,4 +1,58 @@
 <Solution>
+  <Folder Name="/frontend/">
+    <File Path="frontend/.eslintrc.js" />
+    <File Path="frontend/.gitignore" />
+    <File Path="frontend/.prettierrc.js" />
+    <File Path="frontend/.watchmanconfig" />
+    <File Path="frontend/app.json" />
+    <File Path="frontend/App.tsx" />
+    <File Path="frontend/babel.config.js" />
+    <File Path="frontend/Gemfile" />
+    <File Path="frontend/index.js" />
+    <File Path="frontend/jest.config.js" />
+    <File Path="frontend/metro.config.js" />
+    <File Path="frontend/package-lock.json" />
+    <File Path="frontend/package.json" />
+    <File Path="frontend/README.md" />
+    <File Path="frontend/tsconfig.json" />
+  </Folder>
+  <Folder Name="/frontend/android/">
+    <File Path="frontend/android/build.gradle" />
+    <File Path="frontend/android/gradle.properties" />
+    <File Path="frontend/android/gradlew" />
+    <File Path="frontend/android/gradlew.bat" />
+    <File Path="frontend/android/settings.gradle" />
+  </Folder>
+  <Folder Name="/frontend/android/app/">
+    <File Path="frontend/android/app/build.gradle" />
+    <File Path="frontend/android/app/debug.keystore" />
+    <File Path="frontend/android/app/proguard-rules.pro" />
+  </Folder>
+  <Folder Name="/frontend/android/app/src/" />
+  <Folder Name="/frontend/android/app/src/main/">
+    <File Path="frontend/android/app/src/main/AndroidManifest.xml" />
+  </Folder>
+  <Folder Name="/frontend/android/app/src/main/java/" />
+  <Folder Name="/frontend/android/app/src/main/java/com/" />
+  <Folder Name="/frontend/android/app/src/main/java/com/frontend/">
+    <File Path="frontend/android/app/src/main/java/com/frontend/MainActivity.kt" />
+    <File Path="frontend/android/app/src/main/java/com/frontend/MainApplication.kt" />
+  </Folder>
+  <Folder Name="/frontend/android/app/src/main/java/com/frontend/callrecorder/">
+    <File Path="CallRecorderModule.kt" />
+    <File Path="CallRecorderPackage.kt" />
+    <File Path="CallRecordingService.kt" />
+    <File Path="PhoneStateReceiver.kt" />
+  </Folder>
+  <Folder Name="/frontend/android/app/src/native/">
+    <File Path="CallRecorder.ts" />
+  </Folder>
+  <Folder Name="/frontend/android/gradle/" />
+  <Folder Name="/frontend/android/gradle/wrapper/">
+    <File Path="frontend/android/gradle/wrapper/gradle-wrapper.jar" />
+    <File Path="frontend/android/gradle/wrapper/gradle-wrapper.properties" />
+  </Folder>
+  <Folder Name="/frontend/ios/" />
   <Project Path="CallRecorderMobileApp.Api/CallRecorderMobileApp.Api.csproj" />
   <Project Path="CallRecorderMobileApp.Models/CallRecorderMobileApp.Models.csproj" Id="1ace283d-32ee-466a-a9bc-e367802ea095" />
 </Solution>
