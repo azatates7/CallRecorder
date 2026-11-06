@@ -15,7 +15,7 @@ Telefonda **gelen ve giden aramaları otomatik olarak** cihazın yerel depolamas
 
 **Kapsam dışı (bilinçli olarak):**
 - Backend, bulut yedekleme, hesap/giriş, analytics — **uygulama internete çıkmaz**, `INTERNET` izni eklenmez
-- iOS (iOS arama kaydına izin vermez)
+- iOS (iOS arama kaydına izin vermez) — `ios/`, `Gemfile`, `.bundle/` projeden kaldırıldı
 - Play Store dağıtımı (bkz. §2) — APK yan yükleme (sideload) ile kişisel kullanım
 - Kişi adları (READ_CONTACTS) → Faz 2'de opsiyonel
 
@@ -77,7 +77,7 @@ CallRecorder/
     ├── res/xml/
     │   ├── file_paths.xml               # FileProvider
     │   └── accessibility_service.xml
-    └── java/<paket>/callrecorder/
+    └── java/com/callrecorder/recorder/   # paket: com.callrecorder.recorder
         ├── CallRecorderModule.kt        # RN köprüsü (@ReactMethod'lar + event emitter)
         ├── CallRecorderPackage.kt
         ├── CallMonitorService.kt        # Foreground service, arama durumu dinleyici
@@ -195,17 +195,23 @@ Birim testleri: JS tarafında `utils/` ve hook'lar için Jest; Kotlin tarafında
 
 ## 11. Komutlar
 
+> Geliştirme ortamı: **Windows + PowerShell**. Gradle komutları `.\gradlew` ile çalıştırılır.
+> **`npx expo ...` komutu kesinlikle çalıştırılmaz ve `expo` paketi eklenmez** — bare RN projesinde autolinking `:expo` projesini build'e ekler ve build kırılır.
+
 ```bash
 npm install
 npx react-native start                 # Metro
 npx react-native run-android           # debug, bağlı cihaza
-cd android && ./gradlew assembleRelease   # release APK → android/app/build/outputs/apk/release/
+cd android && ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a   # telefona kurulacak release APK (yalnızca arm64) → android/app/build/outputs/apk/release/
+npx react-native run-android --active-arch-only   # debug: yalnızca bağlı cihazın/emülatörün ABI'si derlenir
 adb logcat -s CallRecorder:*           # native loglar (TAG = "CallRecorder")
 npm test
 npx tsc --noEmit && npx eslint .
 ```
 
-Kurulumda doldur: RN sürümü `____`, minSdk `26`, targetSdk `____` (kurulumdaki varsayılan), Kotlin/AGP sürümleri `____`.
+Boyut: release'te R8 (`enableProguardInReleaseBuilds = true`) + `shrinkResources` açık; `gradle.properties` içinde `reactNativeArchitectures=arm64-v8a,x86_64` (telefon + emülatör). Debug APK boyutu önemsizdir, boyut her zaman release APK üzerinden ölçülür.
+
+Sürümler (kurulumdaki varsayılanlar): RN `____` (package.json'dan doldur), minSdk `24`, compileSdk `37`, targetSdk `36`, Kotlin `2.2.0`, Gradle `9.4.1`.
 
 ## 12. Kodlama kuralları
 
