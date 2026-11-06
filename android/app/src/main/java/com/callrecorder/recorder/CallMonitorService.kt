@@ -5,6 +5,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
+import android.content.pm.ApplicationInfo
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
@@ -14,10 +15,12 @@ import android.telephony.TelephonyManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 
 /**
  * Kalıcı bildirimle çalışan ön plan servisi; arama durumunu dinler (CLAUDE.md §2.4, §6).
- * Faz 1a: yalnızca durum geçişlerini loglar, kayıt yapmaz.
+ * OFFHOOK'ta kaydı başlatır, IDLE'da durdurup meta veriyi yazar.
  */
 class CallMonitorService : Service() {
 
@@ -25,6 +28,23 @@ class CallMonitorService : Service() {
     private var callback: Any? = null // API 31+: TelephonyCallback, altı: PhoneStateListener
     private var lastState = TelephonyManager.CALL_STATE_IDLE
     private var direction = "unknown"
+    private var ringingAt = 0L
+
+    /** Süren aramanın kayıt bilgisi; arama yokken null. */
+    private data class Session(
+        val id: String,
+        val startedAt: Long,
+        val lookupSince: Long,
+        val direction: String,
+        val audioRoute: String,
+    )
+
+    private var recorder: CallRecorder? = null
+    private var session: Session? = null
+    private val repository by lazy { RecordingRepository(this) }
+    private val callLogResolver by lazy { CallLogResolver(this) }
+    // Arama geçmişi beklemesi ve dosya yazma ana thread'i bloklamasın diye
+    private val io: ExecutorService = Executors.newSingleThreadExecutor()
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -47,7 +67,9 @@ class CallMonitorService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = START_STICKY
 
     override fun onDestroy() {
+        stopRecording() // servis arama sürerken kapatılırsa kaydı kaybetme
         unregisterCallStateListener()
+        io.shutdown() // kuyruktaki meta veri yazımı tamamlanır
         isRunning = false
         Log.i(TAG, "İzleme servisi durdu")
         super.onDestroy()
@@ -112,35 +134,98 @@ class CallMonitorService : Service() {
         callback = null
     }
 
-    /** Durum geçişleri (CLAUDE.md §6). Kayıt Faz 1b'de OFFHOOK/IDLE noktalarına bağlanacak. */
+    /** Durum geçişleri (CLAUDE.md §6). */
     private fun onCallState(state: Int) {
         when (state) {
             TelephonyManager.CALL_STATE_RINGING -> {
                 direction = "incoming"
+                ringingAt = System.currentTimeMillis()
                 Log.i(TAG, "RINGING — gelen arama")
             }
             TelephonyManager.CALL_STATE_OFFHOOK -> {
                 if (lastState == TelephonyManager.CALL_STATE_IDLE) direction = "outgoing"
                 Log.i(TAG, "OFFHOOK — arama başladı, yön=$direction")
+                startRecording()
             }
             TelephonyManager.CALL_STATE_IDLE -> {
                 when (lastState) {
-                    TelephonyManager.CALL_STATE_OFFHOOK -> Log.i(TAG, "IDLE — arama bitti, yön=$direction")
+                    TelephonyManager.CALL_STATE_OFFHOOK -> {
+                        Log.i(TAG, "IDLE — arama bitti, yön=$direction")
+                        stopRecording()
+                    }
                     TelephonyManager.CALL_STATE_RINGING -> Log.i(TAG, "IDLE — cevapsız/reddedilen arama, kayıt yok")
                 }
                 direction = "unknown"
+                ringingAt = 0L
             }
         }
         lastState = state
     }
 
+    private fun startRecording() {
+        // Bekleyen ikinci arama vb. durumlarda ikinci OFFHOOK yeni kayıt açmaz (CLAUDE.md §6.7)
+        if (recorder != null) return
+        val now = System.currentTimeMillis()
+        val id = repository.newId(now)
+        val rec = CallRecorder(this)
+        if (!rec.start(repository.audioFile(id))) return
+        recorder = rec
+        // Arama geçmişi gelen aramayı çalma anıyla, gideni arama başlangıcıyla kaydeder
+        val reference = if (direction == "incoming" && ringingAt > 0) ringingAt else now
+        session = Session(
+            id = id,
+            startedAt = now,
+            lookupSince = reference - LOOKUP_TOLERANCE_MS,
+            direction = direction,
+            audioRoute = CallRecorder.detectAudioRoute(this),
+        )
+    }
+
+    private fun stopRecording() {
+        val rec = recorder ?: return
+        val s = session ?: return
+        recorder = null
+        session = null
+        val result = rec.stop() ?: return
+        if (result.durationMs < MIN_DURATION_MS) {
+            result.file.delete()
+            Log.i(TAG, "Kayıt 1 sn'den kısa, kaydedilmedi")
+            return
+        }
+        io.execute {
+            val entry = callLogResolver.resolve(s.lookupSince)
+            val meta = RecordingMeta(
+                id = s.id,
+                number = entry?.number,
+                direction = entry?.direction?.takeIf { it != "unknown" } ?: s.direction,
+                startedAt = s.startedAt,
+                durationMs = result.durationMs,
+                sizeBytes = result.file.length(),
+                audioSource = result.source,
+                audioRoute = s.audioRoute,
+            )
+            try {
+                repository.saveMetadata(meta)
+                Log.i(TAG, "Kayıt kaydedildi: ${s.id}.m4a, süre=${meta.durationMs / 1000} sn, kaynak=${meta.audioSource}, yön=${meta.direction}")
+                if (isDebuggable()) Log.d(TAG, "Numara: ${meta.number}")
+            } catch (e: Exception) {
+                Log.e(TAG, "Meta veri yazılamadı", e)
+            }
+        }
+    }
+
+    private fun isDebuggable(): Boolean =
+        (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
+
     companion object {
         private const val TAG = CallRecorderModule.TAG
         private const val CHANNEL_ID = "call_monitor"
         private const val NOTIFICATION_ID = 1001
+        private const val MIN_DURATION_MS = 1_000L
+        private const val LOOKUP_TOLERANCE_MS = 5_000L
 
         @Volatile
         var isRunning = false
             private set
     }
-}
+}adb shell am force-stop com.callrecorder
