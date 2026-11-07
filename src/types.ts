@@ -38,4 +38,6 @@ export interface RecorderSettings {
   autoRecord: boolean;
   preferredSource: AudioSourceName | 'AUTO';
   sampleRate: SampleRate;
+  /** İlk açılıştaki yasal bilgilendirme onaylandı mı (CLAUDE.md §13). */
+  disclaimerAccepted: boolean;
 }

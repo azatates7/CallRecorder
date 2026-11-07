@@ -27,6 +27,11 @@ class Prefs(context: Context) {
         get() = sp.getBoolean(KEY_MONITORING, false)
         set(value) = sp.edit().putBoolean(KEY_MONITORING, value).apply()
 
+    /** İlk açılıştaki yasal bilgilendirme onaylandı mı (CLAUDE.md §13). */
+    var disclaimerAccepted: Boolean
+        get() = sp.getBoolean(KEY_DISCLAIMER, false)
+        set(value) = sp.edit().putBoolean(KEY_DISCLAIMER, value).apply()
+
     companion object {
         const val SOURCE_AUTO = "AUTO"
         val SAMPLE_RATES = listOf(16_000, 44_100)
@@ -35,5 +40,6 @@ class Prefs(context: Context) {
         private const val KEY_SOURCE = "preferredSource"
         private const val KEY_SAMPLE_RATE = "sampleRate"
         private const val KEY_MONITORING = "monitoringEnabled"
+        private const val KEY_DISCLAIMER = "disclaimerAccepted"
     }
 }

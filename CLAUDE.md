@@ -70,6 +70,7 @@ CallRecorder/
 │   │   ├── usePlayer.ts
 │   │   └── useServiceStatus.ts
 │   ├── components/
+│   │   └── DisclaimerModal.tsx    # ilk açılış yasal bilgilendirmesi (§13)
 │   ├── utils/format.ts            # süre, tarih, numara biçimleme
 │   └── types.ts
 └── android/app/src/main/
@@ -84,6 +85,7 @@ CallRecorder/
         ├── CallRecorder.kt              # MediaRecorder sarmalayıcı + audio source fallback
         ├── RecordingRepository.kt       # .m4a + .json okuma/yazma/silme
         ├── CallLogResolver.kt           # arama sonrası numara/yön/süre eşleştirme
+        ├── RecordingPlayer.kt           # MediaPlayer sarmalayıcı (oynat/duraklat/atla, ilerleme olayları)
         ├── KeepAliveAccessibilityService.kt
         ├── BootReceiver.kt
         └── Prefs.kt                     # SharedPreferences (ayarlar)
@@ -121,21 +123,22 @@ getStatus(): Promise<{
   monitoring: boolean;
   accessibilityEnabled: boolean;
   ignoringBatteryOptimizations: boolean;
-  permissions: Record<string, 'granted' | 'denied' | 'blocked'>;
+  permissions: Record<'RECORD_AUDIO' | 'READ_PHONE_STATE' | 'READ_CALL_LOG' | 'POST_NOTIFICATIONS', 'granted' | 'denied'>;
 }>
 openAccessibilitySettings(): Promise<void>
+openAppSettings(): Promise<void>                 // kalıcı reddedilen izinler, kısıtlı ayarlar
 requestIgnoreBatteryOptimizations(): Promise<void>
 
 // Ayarlar
-getSettings(): Promise<{ autoRecord: boolean; preferredSource: AudioSourceName | 'AUTO'; sampleRate: 16000 | 44100 }>
-setSettings(s: Partial<...>): Promise<void>
+getSettings(): Promise<{ autoRecord: boolean; preferredSource: AudioSourceName | 'AUTO'; sampleRate: 16000 | 44100; disclaimerAccepted: boolean }>
+setSettings(s: Partial<...>): Promise<Settings>   // güncel ayarları döner
 
 // Oynatma
 play(id: string): Promise<void>; pause(): Promise<void>; seekTo(ms: number): Promise<void>; stop(): Promise<void>
 
-// Event'ler (NativeEventEmitter)
-'recordingStarted' | 'recordingSaved' (payload: Recording) | 'recordingFailed' (payload: { reason: string })
-'playbackProgress' ({ positionMs, durationMs }) | 'playbackEnded'
+// Event'ler (Kotlin: emitDeviceEvent, JS: DeviceEventEmitter — addCallRecorderListener)
+'recordingSaved' (payload: Recording)
+'playbackProgress' ({ id, positionMs, durationMs }) | 'playbackEnded' ({ id })
 ```
 
 ## 6. Kayıt akışı
@@ -145,7 +148,7 @@ play(id: string): Promise<void>; pause(): Promise<void>; seekTo(ms: number): Pro
 3. `OFFHOOK` → `autoRecord` açıksa kaydı başlat. Önceki durum `RINGING` değilse yön `outgoing`.
 4. Ses kaynağı **fallback zinciri** (`preferredSource = AUTO` ise): `VOICE_CALL → VOICE_COMMUNICATION → VOICE_RECOGNITION → MIC`. Her biri için `prepare()` + `start()` dene; exception'da sonrakine geç. Başarılı kaynağı meta veriye yaz. Not: bazı cihazlarda `VOICE_CALL` exception atmadan **sessiz dosya** üretir — ilk 2 sn `getMaxAmplitude()` sürekli 0 ise durdur ve sonraki kaynağa geç.
 5. `IDLE` → kaydı durdur, `CallLogResolver` ile numara/yön/süreyi doldur (CallLog gecikmeli yazabilir → kısa retry: 3 deneme, 1 sn arayla), `.json` yaz, `recordingSaved` event'i gönder.
-6. Hata durumları: yarım dosya kalırsa sil; süre < 1 sn ise kaydetme; hatayı `recordingFailed` ile bildir ve logla.
+6. Hata durumları: yarım dosya kalırsa sil; süre < 1 sn ise kaydetme; hatayı logla.
 7. Bekleme/çift arama: MVP'de aktif arama sürdüğü müddetçe **tek dosya** (ikinci arama ayrı kaydedilmez). Bunu bilinen sınırlama olarak not et.
 
 ## 7. İzinler (AndroidManifest)
@@ -157,7 +160,7 @@ play(id: string): Promise<void>; pause(): Promise<void>; seekTo(ms: number): Pro
 - `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`
 - `<service android:foregroundServiceType="microphone">`
 - AccessibilityService: `BIND_ACCESSIBILITY_SERVICE` permission ile, `accessibility_service.xml` içinde hiçbir olay türü dinlenmez (`accessibilityEventTypes` minimum), açıklama metni amacını dürüstçe anlatır.
-- **`INTERNET` eklenmez.**
+- **`INTERNET` ana manifest'te yok.** Yalnızca debug'da Metro bağlantısı için `android/app/src/debug/AndroidManifest.xml`'de tanımlı; release APK'da bulunmaz.
 
 İzin isteme sırası (Durum ekranında adım adım, her biri neden gerektiğini tek cümleyle açıklar): Mikrofon → Telefon durumu → Arama kaydı → Bildirim → Pil optimizasyonu → Erişilebilirlik.
 
@@ -170,11 +173,29 @@ play(id: string): Promise<void>; pause(): Promise<void>; seekTo(ms: number): Pro
 
 ## 9. Fazlar
 
-1. **Faz 0 — İskelet:** RN projesi (TS), navigasyon, boş ekranlar, native modül iskeleti ve `ping()` ile köprü testi. Debug APK cihazda açılıyor.
-2. **Faz 1 — Kayıt çekirdeği:** Servis, arama dinleme, fallback zinciri, dosya + JSON yazma. Logcat ile doğrulama (UI olmadan).
-3. **Faz 2 — Liste & oynatma:** `listRecordings`, oynatıcı, sil, paylaş.
-4. **Faz 3 — İzinler & Durum ekranı:** izin akışı, erişilebilirlik, pil, boot davranışı.
-5. **Faz 4 — Cila:** filtre/arama, kişi adları (opsiyonel, READ_CONTACTS), otomatik silme (X günden eski), release APK imzalama.
+1. **Faz 0 — İskelet:** RN projesi (TS), navigasyon, boş ekranlar, native modül iskeleti ve `ping()` ile köprü testi. Debug APK cihazda açılıyor. ✅
+2. **Faz 1 — Kayıt çekirdeği:**
+   - **1a:** Manifest izinleri, `CallMonitorService` (ön plan servisi + arama durumu logları), `startMonitoring`/`stopMonitoring`/`isMonitoring` (geçici) ve Durum ekranında geçici aç/kapa anahtarı. Kayıt yok. ✅
+   - **1b:** `CallRecorder.kt` (fallback zinciri), `RecordingRepository.kt`, `CallLogResolver.kt`; dosya + JSON yazma. Logcat ve `adb shell ls` ile doğrulama. ✅
+     - JSON'da `filePath` yerine `fileName` tutulur; tam yol listelemede (Faz 2) `RecordingRepository.dir` ile üretilir.
+     - `audioRoute` kayıt başladığı anki değerdir; arama içinde değişirse yansımaz.
+     - Servis çalışırken her arama kaydedilir; `autoRecord` ayarı Faz 3'te bağlanır.
+   - Faz 1'de izinler `adb shell pm grant` ile verilir; izin ekranı Faz 3'te.
+3. **Faz 2 — Liste & oynatma:** `listRecordings`, oynatıcı, sil, paylaş. ✅
+   - Oynatıcı `RecordingPlayer.kt`'de (MediaPlayer, işlemler ana thread'de). Kaydırma çubuğu için paket eklenmedi: dokunarak konuma atlama + ±10 sn düğmeleri.
+   - Olaylar Kotlin'de `emitDeviceEvent`, JS'te `DeviceEventEmitter` ile (`addCallRecorderListener`). Servis → modül aktarımı `RecordingEvents` nesnesiyle.
+   - Filtre (gelen/giden) ve numara arama Faz 4'te.
+4. **Faz 3 — İzinler & Durum ekranı:** izin akışı, erişilebilirlik, pil, boot davranışı. ✅
+   - Çalışma zamanı izinleri RN'in yerleşik `PermissionsAndroid` ile istenir (paket yok). Native `getStatus` yalnızca granted/denied döner; "kalıcı reddedildi" JS'te istek sonucundan anlaşılır ve `openAppSettings` ile uygulama ayarlarına yönlendirilir.
+   - `isMonitoring` kaldırıldı, yerini `getStatus().monitoring` aldı. `Prefs.monitoringEnabled` kullanıcının izlemeyi açık bırakıp bırakmadığını tutar.
+   - Açılışta servis iki yoldan geri getirilmeye çalışılır: `BootReceiver` ve erişilebilirlik servisinin `onServiceConnected`'ı. İkisi de başarısızsa `StartupNotice` bildirimi gösterilir; servis başlayınca bildirim kaldırılır.
+   - `preferredSource` AUTO değilse yalnızca o kaynak denenir (sessiz de olsa). Ayarlar bir sonraki aramadan itibaren geçerlidir.
+   - Android 13+'da yan yüklenen uygulamalarda erişilebilirlik anahtarı "Kısıtlı ayarlar" yüzünden gri olabilir; Durum ekranı nasıl açılacağını söyler.
+   - Ertelenenler: `src/strings.ts` ve ilk açılış yasal bilgilendirmesi Faz 4'e alındı (bkz. Faz 4).
+5. **Faz 4 — Cila:**
+   - **4a:** Kayıtlar ekranında yön filtresi (Tümü/Gelen/Giden) + numara araması (rakamlar boşluk/+/tire farkı gözetmeden eşleşir); ilk açılış yasal bilgilendirmesi (`DisclaimerModal`, onay `Prefs.disclaimerAccepted`'da); `INTERNET` izni `src/debug/AndroidManifest.xml`'e taşındı; release APK kendi anahtarıyla imzalanır.
+   - `recordingStarted`/`recordingFailed` olayları sözleşmeden çıkarıldı: arayüz kullanmıyor, hatalar logcat'te.
+   - Açık (karar bekliyor): kişi adları (READ_CONTACTS), otomatik silme (X günden eski), metinlerin `src/strings.ts`'e toplanması.
 
 Her faz sonunda: gerçek cihazda §10 kontrol listesinin ilgili maddeleri.
 
@@ -209,6 +230,8 @@ npm test
 npx tsc --noEmit && npx eslint .
 ```
 
+İmzalama: release anahtarı `android/app/callrecorder-release.keystore` (git'e girmez, `.gitignore`'daki `*.keystore` kuralı). Şifreler repo'da değil `%USERPROFILE%\.gradle\gradle.properties` içinde (`CALLRECORDER_STORE_PASSWORD`, `CALLRECORDER_KEY_PASSWORD`). Anahtar kaybolursa güncelleme yüklenemez; uygulama silinip yeniden kurulmalı (kayıtlar silinir) → anahtarı yedekle.
+
 Boyut: release'te R8 (`enableProguardInReleaseBuilds = true`) + `shrinkResources` açık; `gradle.properties` içinde `reactNativeArchitectures=arm64-v8a,x86_64` (telefon + emülatör). Debug APK boyutu önemsizdir, boyut her zaman release APK üzerinden ölçülür.
 
 Sürümler (kurulumdaki varsayılanlar): RN `____` (package.json'dan doldur), minSdk `24`, compileSdk `37`, targetSdk `36`, Kotlin `2.2.0`, Gradle `9.4.1`.
@@ -216,7 +239,7 @@ Sürümler (kurulumdaki varsayılanlar): RN `____` (package.json'dan doldur), mi
 ## 12. Kodlama kuralları
 
 - TypeScript `strict`. `any` yok; native dönüşleri `src/types.ts`'teki tiplere map'le.
-- Kotlin: her public işlem `try/catch` ile sarılır, hata `Promise.reject(code, message)` ile JS'e döner; hata kodları sabit (`E_PERMISSION`, `E_RECORDER`, `E_IO`, `E_NOT_FOUND`).
+- Kotlin: her public işlem `try/catch` ile sarılır, hata `Promise.reject(code, message)` ile JS'e döner; hata kodları sabit (`E_PERMISSION`, `E_SERVICE`, `E_RECORDER`, `E_IO`, `E_NOT_FOUND`, `E_INVALID`, `E_PLAYER`).
 - Log TAG'i her yerde `CallRecorder`. Kişisel veri (numara) yalnızca debug build'de loglanır.
 - Değişiklikler **küçük ve hedefli**: istenmeyen refactor, yeniden adlandırma, format değişikliği yapma. Bir dosyaya dokunuyorsan nedenini commit mesajında yaz.
 - Yeni bir mimari karar alındığında bu dosyanın ilgili bölümünü güncelle.

@@ -1,0 +1,7 @@
+<!--
+  Yalnızca debug build'e eklenir: Metro'ya bağlanmak için INTERNET izni.
+  Release APK'da bu izin yoktur; uygulama internete çıkamaz (CLAUDE.md §1, §7).
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET" />
+</manifest>

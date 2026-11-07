@@ -92,6 +92,12 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        release {
+        storeFile file('callrecorder-release.keystore')
+        storePassword findProperty('CALLRECORDER_STORE_PASSWORD') ?: ''
+        keyAlias 'callrecorder'
+        keyPassword findProperty('CALLRECORDER_KEY_PASSWORD') ?: ''
+        }
     }
     buildTypes {
         debug {

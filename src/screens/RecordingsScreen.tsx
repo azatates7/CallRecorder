@@ -1,10 +1,30 @@
 import React, { useMemo, useState } from 'react';
-import { Alert, Pressable, SectionList, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, SectionList, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useRecordings } from '../hooks/useRecordings';
 import { CallRecorder } from '../native/CallRecorder';
-import type { Recording } from '../types';
+import type { Direction, Recording } from '../types';
 import { dayKey, formatDayTitle, formatDuration, formatNumber, formatTime } from '../utils/format';
 import PlayerSheet from './PlayerSheet';
+
+type Filter = 'all' | Exclude<Direction, 'unknown'>;
+
+const FILTERS: { value: Filter; label: string }[] = [
+  { value: 'all', label: 'Tümü' },
+  { value: 'incoming', label: 'Gelen' },
+  { value: 'outgoing', label: 'Giden' },
+];
+
+const digitsOf = (s: string) => s.replace(/\D/g, '');
+
+/** Yön filtresi + numara araması. Rakamlar boşluk/tire/+ farkı gözetmeden karşılaştırılır. */
+function matches(r: Recording, filter: Filter, query: string): boolean {
+  if (filter !== 'all' && r.direction !== filter) return false;
+  const q = query.trim();
+  if (!q) return true;
+  const qDigits = digitsOf(q);
+  if (qDigits) return digitsOf(r.number ?? '').includes(qDigits);
+  return formatNumber(r.number).toLocaleLowerCase('tr').includes(q.toLocaleLowerCase('tr'));
+}
 
 interface Section {
   key: string;
@@ -34,7 +54,13 @@ function errorMessage(e: unknown): string {
 export default function RecordingsScreen() {
   const { recordings, loading, error, reload, remove } = useRecordings();
   const [selected, setSelected] = useState<Recording | null>(null);
-  const sections = useMemo(() => groupByDay(recordings), [recordings]);
+  const [filter, setFilter] = useState<Filter>('all');
+  const [query, setQuery] = useState('');
+  const sections = useMemo(
+    () => groupByDay(recordings.filter(r => matches(r, filter, query))),
+    [recordings, filter, query],
+  );
+  const filtering = filter !== 'all' || query.trim() !== '';
 
   const confirmDelete = (r: Recording) => {
     Alert.alert('Kaydı sil', `${formatNumber(r.number)} · ${formatTime(r.startedAt)} silinsin mi?`, [
@@ -65,6 +91,27 @@ export default function RecordingsScreen() {
   return (
     <View style={styles.container}>
       {error ? <Text style={styles.error}>{error}</Text> : null}
+      <View style={styles.toolbar}>
+        <TextInput
+          style={styles.search}
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Numara ara"
+          placeholderTextColor="#999"
+          keyboardType="phone-pad"
+          clearButtonMode="while-editing"
+        />
+        <View style={styles.filters}>
+          {FILTERS.map(f => (
+            <Pressable
+              key={f.value}
+              style={[styles.filter, filter === f.value && styles.filterActive]}
+              onPress={() => setFilter(f.value)}>
+              <Text style={[styles.filterText, filter === f.value && styles.filterTextActive]}>{f.label}</Text>
+            </Pressable>
+          ))}
+        </View>
+      </View>
       <SectionList
         sections={sections}
         keyExtractor={item => item.id}
@@ -89,7 +136,9 @@ export default function RecordingsScreen() {
         )}
         ListEmptyComponent={
           loading ? undefined : (
-            <Text style={styles.empty}>Henüz kayıt yok. Durum ekranındaki adımları tamamlayın.</Text>
+            <Text style={styles.empty}>
+              {filtering ? 'Eşleşen kayıt yok.' : 'Henüz kayıt yok. Durum ekranındaki adımları tamamlayın.'}
+            </Text>
           )
         }
         contentContainerStyle={sections.length === 0 ? styles.emptyContainer : undefined}
@@ -102,6 +151,28 @@ export default function RecordingsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   error: { color: '#c62828', padding: 16 },
+  toolbar: { padding: 12, backgroundColor: '#fff', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#ddd' },
+  search: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 16,
+    color: '#111',
+  },
+  filters: { flexDirection: 'row', marginTop: 8 },
+  filter: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    marginRight: 8,
+  },
+  filterActive: { backgroundColor: '#1976d2', borderColor: '#1976d2' },
+  filterText: { fontSize: 14, color: '#111' },
+  filterTextActive: { color: '#fff' },
   header: {
     fontSize: 13,
     fontWeight: '600',

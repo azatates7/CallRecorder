@@ -169,6 +169,7 @@ class CallRecorderModule(reactContext: ReactApplicationContext) :
             if (settings.hasKey("autoRecord")) prefs.autoRecord = settings.getBoolean("autoRecord")
             if (source != null) prefs.preferredSource = source
             if (rate != null) prefs.sampleRate = rate
+            if (settings.hasKey("disclaimerAccepted")) prefs.disclaimerAccepted = settings.getBoolean("disclaimerAccepted")
             promise.resolve(settingsMap())
         } catch (e: Exception) {
             promise.reject("E_IO", e.message, e)
@@ -273,6 +274,7 @@ class CallRecorderModule(reactContext: ReactApplicationContext) :
         putBoolean("autoRecord", prefs.autoRecord)
         putString("preferredSource", prefs.preferredSource)
         putInt("sampleRate", prefs.sampleRate)
+        putBoolean("disclaimerAccepted", prefs.disclaimerAccepted)
     }
 
     private fun settle(promise: Promise, error: Throwable?) {
