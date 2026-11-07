@@ -55,9 +55,11 @@ class CallMonitorService : Service() {
         } catch (e: Exception) {
             // Örn. Android 12+ arka plandan başlatma yasağı veya eksik RECORD_AUDIO izni
             Log.e(TAG, "Ön plan servisi başlatılamadı", e)
+            StartupNotice.show(this)
             stopSelf()
             return
         }
+        StartupNotice.cancel(this)
         telephony = getSystemService(TelephonyManager::class.java)
         registerCallStateListener()
         isRunning = true
@@ -165,9 +167,14 @@ class CallMonitorService : Service() {
     private fun startRecording() {
         // Bekleyen ikinci arama vb. durumlarda ikinci OFFHOOK yeni kayıt açmaz (CLAUDE.md §6.7)
         if (recorder != null) return
+        val prefs = Prefs(this)
+        if (!prefs.autoRecord) {
+            Log.i(TAG, "Otomatik kayıt kapalı, arama kaydedilmiyor")
+            return
+        }
         val now = System.currentTimeMillis()
         val id = repository.newId(now)
-        val rec = CallRecorder(this)
+        val rec = CallRecorder(this, prefs.preferredSource, prefs.sampleRate)
         if (!rec.start(repository.audioFile(id))) return
         recorder = rec
         // Arama geçmişi gelen aramayı çalma anıyla, gideni arama başlangıcıyla kaydeder
@@ -206,6 +213,7 @@ class CallMonitorService : Service() {
             )
             try {
                 repository.saveMetadata(meta)
+                RecordingEvents.saved(meta) // uygulama açıksa liste yenilenir
                 Log.i(TAG, "Kayıt kaydedildi: ${s.id}.m4a, süre=${meta.durationMs / 1000} sn, kaynak=${meta.audioSource}, yön=${meta.direction}")
                 if (isDebuggable()) Log.d(TAG, "Numara: ${meta.number}")
             } catch (e: Exception) {
@@ -228,4 +236,4 @@ class CallMonitorService : Service() {
         var isRunning = false
             private set
     }
-}adb shell am force-stop com.callrecorder
+}

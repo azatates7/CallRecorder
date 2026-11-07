@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Paylaşım için FileProvider'ın açabileceği klasörler (CLAUDE.md §3). -->
+<paths>
+    <!-- getExternalFilesDir(...): Recordings (API 31+) veya Music -->
+    <external-files-path name="recordings" path="." />
+    <!-- Harici depolama yoksa kullanılan iç klasör -->
+    <files-path name="recordings_internal" path="recordings/" />
+</paths>

@@ -7,6 +7,9 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
     <application
       android:name=".MainApplication"
       android:label="@string/app_name"
@@ -28,9 +31,45 @@
             <category android:name="android.intent.category.LAUNCHER" />
         </intent-filter>
       </activity>
+
+      <!-- Arama izleme ve kayıt (Faz 1) -->
       <service
         android:name="com.callrecorder.recorder.CallMonitorService"
         android:exported="false"
         android:foregroundServiceType="microphone" />
+
+      <!-- Kayıt paylaşma (Faz 2) -->
+      <provider
+        android:name="androidx.core.content.FileProvider"
+        android:authorities="${applicationId}.fileprovider"
+        android:exported="false"
+        android:grantUriPermissions="true">
+        <meta-data
+          android:name="android.support.FILE_PROVIDER_PATHS"
+          android:resource="@xml/file_paths" />
+      </provider>
+
+      <!-- Android 10+ arama sırasında mikrofon erişimi (Faz 3, CLAUDE.md §2.3) -->
+      <service
+        android:name="com.callrecorder.recorder.KeepAliveAccessibilityService"
+        android:label="@string/accessibility_label"
+        android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+        android:exported="false">
+        <intent-filter>
+            <action android:name="android.accessibilityservice.AccessibilityService" />
+        </intent-filter>
+        <meta-data
+          android:name="android.accessibilityservice"
+          android:resource="@xml/accessibility_service" />
+      </service>
+
+      <!-- Yeniden başlatma sonrası izlemeyi geri getirme (Faz 3, CLAUDE.md §2.5) -->
+      <receiver
+        android:name="com.callrecorder.recorder.BootReceiver"
+        android:exported="true">
+        <intent-filter>
+            <action android:name="android.intent.action.BOOT_COMPLETED" />
+        </intent-filter>
+      </receiver>
     </application>
 </manifest>

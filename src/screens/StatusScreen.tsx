@@ -1,70 +1,236 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { StyleSheet, Switch, Text, View } from 'react-native';
+import React, { useState } from 'react';
+import {
+  PermissionsAndroid,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  View,
+} from 'react-native';
+import { useRecordings } from '../hooks/useRecordings';
+import { useServiceStatus } from '../hooks/useServiceStatus';
 import { CallRecorder } from '../native/CallRecorder';
+import type { PermissionKey, RecorderSettings, SampleRate } from '../types';
+import { formatBytes } from '../utils/format';
+
+/** İzin isteme sırası CLAUDE.md §7'deki sırayla aynıdır. */
+const PERMISSION_ROWS: { key: PermissionKey; title: string; why: string }[] = [
+  { key: 'RECORD_AUDIO', title: 'Mikrofon', why: 'Arama sesini kaydetmek için.' },
+  { key: 'READ_PHONE_STATE', title: 'Telefon durumu', why: 'Aramanın ne zaman başlayıp bittiğini anlamak için.' },
+  { key: 'READ_CALL_LOG', title: 'Arama geçmişi', why: 'Kayda numarayı ve yönü eklemek için.' },
+  { key: 'POST_NOTIFICATIONS', title: 'Bildirim', why: 'Kaydın çalıştığını ve sorunları göstermek için.' },
+];
+
+const SOURCE_OPTIONS: { value: RecorderSettings['preferredSource']; label: string }[] = [
+  { value: 'AUTO', label: 'Otomatik' },
+  { value: 'VOICE_CALL', label: 'Hat sesi' },
+  { value: 'VOICE_COMMUNICATION', label: 'İletişim' },
+  { value: 'VOICE_RECOGNITION', label: 'Tanıma' },
+  { value: 'MIC', label: 'Mikrofon' },
+];
+
+const RATE_OPTIONS: { value: SampleRate; label: string }[] = [
+  { value: 16000, label: 'Standart (16 kHz)' },
+  { value: 44100, label: 'Yüksek (44,1 kHz)' },
+];
 
 function errorMessage(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
 }
 
-export default function StatusScreen() {
-  const [bridge, setBridge] = useState<string>('kontrol ediliyor…');
-  const [monitoring, setMonitoring] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const refreshMonitoring = useCallback(() => {
-    CallRecorder.isMonitoring()
-      .then(setMonitoring)
-      .catch((e: unknown) => setError(errorMessage(e)));
-  }, []);
-
-  useEffect(() => {
-    CallRecorder.ping()
-      .then(setBridge)
-      .catch((e: unknown) => setBridge(`HATA: ${errorMessage(e)}`));
-    refreshMonitoring();
-  }, [refreshMonitoring]);
-
-  const toggleMonitoring = async (value: boolean) => {
-    setError(null);
-    try {
-      if (value) {
-        await CallRecorder.startMonitoring();
-      } else {
-        await CallRecorder.stopMonitoring();
-      }
-    } catch (e) {
-      setError(errorMessage(e));
-    }
-    // Servis kendi içinde başlatılamazsa (ör. Android kısıtı) gerçek durumu yansıt.
-    setTimeout(refreshMonitoring, 500);
-  };
-
+function CheckRow(props: {
+  ok: boolean;
+  title: string;
+  why: string;
+  actionLabel?: string;
+  onAction?: () => void;
+}) {
   return (
-    <View style={styles.container}>
-      <Text style={styles.label}>Native köprü</Text>
-      <Text style={[styles.value, bridge === 'pong' ? styles.ok : styles.fail]}>{bridge}</Text>
-
-      <View style={styles.row}>
-        <View style={styles.rowText}>
-          <Text style={styles.label}>Arama izleme servisi</Text>
-          <Text style={[styles.value, monitoring ? styles.ok : styles.fail]}>
-            {monitoring ? 'Çalışıyor' : 'Kapalı'}
-          </Text>
-        </View>
-        <Switch value={monitoring} onValueChange={toggleMonitoring} />
+    <View style={styles.checkRow}>
+      <Text style={[styles.checkMark, props.ok ? styles.ok : styles.fail]}>{props.ok ? '✓' : '✗'}</Text>
+      <View style={styles.flex}>
+        <Text style={styles.checkTitle}>{props.title}</Text>
+        <Text style={styles.hint}>{props.why}</Text>
       </View>
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {!props.ok && props.actionLabel ? (
+        <Pressable style={styles.action} onPress={props.onAction}>
+          <Text style={styles.actionText}>{props.actionLabel}</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
 
+function Chips<T extends string | number>(props: {
+  options: { value: T; label: string }[];
+  value: T;
+  onChange: (value: T) => void;
+}) {
+  return (
+    <View style={styles.chips}>
+      {props.options.map(o => (
+        <Pressable
+          key={String(o.value)}
+          style={[styles.chip, o.value === props.value && styles.chipActive]}
+          onPress={() => props.onChange(o.value)}>
+          <Text style={[styles.chipText, o.value === props.value && styles.chipTextActive]}>{o.label}</Text>
+        </Pressable>
+      ))}
+    </View>
+  );
+}
+
+export default function StatusScreen() {
+  const { status, settings, error, setError, refresh, updateSettings, setMonitoring } = useServiceStatus();
+  const { recordings } = useRecordings();
+  // Kalıcı reddedilen izinler: Android bir daha sormaz, kullanıcı uygulama ayarlarından açar
+  const [blocked, setBlocked] = useState<Partial<Record<PermissionKey, boolean>>>({});
+
+  const run = (fn: () => Promise<unknown>) => {
+    fn().catch(e => setError(errorMessage(e)));
+  };
+
+  const requestPermission = async (key: PermissionKey) => {
+    if (blocked[key]) {
+      await CallRecorder.openAppSettings();
+      return;
+    }
+    const result = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS[key]);
+    if (result === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN) {
+      setBlocked(b => ({ ...b, [key]: true }));
+    }
+    await refresh();
+  };
+
+  if (!status || !settings) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.hint}>{error ?? 'Yükleniyor…'}</Text>
+      </View>
+    );
+  }
+
+  const canMonitor =
+    status.permissions.RECORD_AUDIO === 'granted' && status.permissions.READ_PHONE_STATE === 'granted';
+  const totalBytes = recordings.reduce((sum, r) => sum + r.sizeBytes, 0);
+
+  return (
+    <ScrollView contentContainerStyle={styles.container}>
+      <Text style={styles.section}>Gerekenler</Text>
+      {PERMISSION_ROWS.map(p => (
+        <CheckRow
+          key={p.key}
+          ok={status.permissions[p.key] === 'granted'}
+          title={p.title}
+          why={p.why}
+          actionLabel={blocked[p.key] ? 'Ayarları aç' : 'İzin ver'}
+          onAction={() => run(() => requestPermission(p.key))}
+        />
+      ))}
+      <CheckRow
+        ok={status.ignoringBatteryOptimizations}
+        title="Pil optimizasyonu kapalı"
+        why="Sistemin arka planda servisi kapatmaması için."
+        actionLabel="Düzelt"
+        onAction={() => run(CallRecorder.requestIgnoreBatteryOptimizations)}
+      />
+      <CheckRow
+        ok={status.accessibilityEnabled}
+        title="Erişilebilirlik servisi"
+        why="Android 10+'da arama sırasında mikrofonun kapatılmaması için. Ekranı okumaz."
+        actionLabel="Aç"
+        onAction={() => run(CallRecorder.openAccessibilitySettings)}
+      />
+      {!status.accessibilityEnabled ? (
+        <Text style={styles.note}>
+          Anahtar gri ve açılamıyorsa: Ayarlar › Uygulamalar › CallRecorder › sağ üstteki ⋮ › "Kısıtlı
+          ayarlara izin ver" seçeneğini açıp tekrar deneyin.
+        </Text>
+      ) : null}
+
+      <Text style={styles.section}>Kayıt</Text>
+      <View style={styles.switchRow}>
+        <View style={styles.flex}>
+          <Text style={styles.checkTitle}>Arama izleme</Text>
+          <Text style={[styles.hint, status.monitoring ? styles.ok : styles.fail]}>
+            {status.monitoring ? 'Çalışıyor' : 'Kapalı'}
+          </Text>
+        </View>
+        <Switch
+          value={status.monitoring}
+          disabled={!canMonitor && !status.monitoring}
+          onValueChange={v => run(() => setMonitoring(v))}
+        />
+      </View>
+      <View style={styles.switchRow}>
+        <View style={styles.flex}>
+          <Text style={styles.checkTitle}>Otomatik kayıt</Text>
+          <Text style={styles.hint}>Kapalıyken izleme sürer ama aramalar kaydedilmez.</Text>
+        </View>
+        <Switch value={settings.autoRecord} onValueChange={v => run(() => updateSettings({ autoRecord: v }))} />
+      </View>
+      {error ? <Text style={styles.error}>{error}</Text> : null}
+
+      <Text style={styles.label}>Ses kaynağı</Text>
+      <Chips
+        options={SOURCE_OPTIONS}
+        value={settings.preferredSource}
+        onChange={v => run(() => updateSettings({ preferredSource: v }))}
+      />
+      <Text style={styles.label}>Kalite</Text>
+      <Chips
+        options={RATE_OPTIONS}
+        value={settings.sampleRate}
+        onChange={v => run(() => updateSettings({ sampleRate: v }))}
+      />
+      <Text style={styles.hint}>Ayar değişiklikleri bir sonraki aramadan itibaren geçerlidir.</Text>
+
+      <Text style={styles.section}>Kayıtlar</Text>
+      <Text style={styles.body}>
+        {recordings.length} kayıt · {formatBytes(totalBytes)}. Kayıtlar yalnızca bu telefonda tutulur;
+        uygulama silinirse kayıtlar da silinir.
+      </Text>
+
+      <Text style={styles.section}>Bilinmesi gerekenler</Text>
+      <Text style={styles.body}>
+        Android, uygulamaların hat sesini doğrudan kaydetmesine izin vermez; kayıt telefonun mikrofonundan
+        alınır. Kendi sesiniz her zaman net kaydedilir, karşı tarafın sesi en iyi hoparlör açıkken duyulur.
+        Kulaklık veya Bluetooth kullanılırken karşı tarafın sesi kayda girmeyebilir. Görüşme kaydı yalnızca
+        kişisel kullanım içindir; karşı tarafı bilgilendirmek sizin sorumluluğunuzdadır.
+      </Text>
+    </ScrollView>
+  );
+}
+
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 24 },
-  label: { fontSize: 14, opacity: 0.7 },
-  value: { fontSize: 20, fontWeight: '600', marginTop: 4 },
+  container: { padding: 16, paddingBottom: 40 },
+  flex: { flex: 1 },
+  section: { fontSize: 13, fontWeight: '700', color: '#666', marginTop: 24, marginBottom: 8 },
+  checkRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8 },
+  checkMark: { fontSize: 18, width: 28, fontWeight: '700' },
+  checkTitle: { fontSize: 16, color: '#111' },
+  hint: { fontSize: 13, color: '#666', marginTop: 2 },
+  note: { fontSize: 13, color: '#8a5a00', marginLeft: 28, marginBottom: 4 },
+  action: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6, backgroundColor: '#1976d2' },
+  actionText: { color: '#fff', fontWeight: '600' },
+  switchRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8 },
   ok: { color: '#2e7d32' },
   fail: { color: '#c62828' },
-  row: { flexDirection: 'row', alignItems: 'center', marginTop: 24 },
-  rowText: { flex: 1 },
-  error: { color: '#c62828', marginTop: 8 },
+  error: { color: '#c62828', marginTop: 4 },
+  label: { fontSize: 14, color: '#111', marginTop: 16, marginBottom: 6 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap' },
+  chip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  chipActive: { backgroundColor: '#1976d2', borderColor: '#1976d2' },
+  chipText: { fontSize: 14, color: '#111' },
+  chipTextActive: { color: '#fff' },
+  body: { fontSize: 14, color: '#333', lineHeight: 20 },
 });

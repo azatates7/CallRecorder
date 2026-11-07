@@ -15,9 +15,20 @@ import java.io.File
  * MediaRecorder sarmalayıcı + ses kaynağı fallback zinciri (CLAUDE.md §6.4).
  * Ana thread'den çağrılır.
  */
-class CallRecorder(private val context: Context) {
+class CallRecorder(
+    private val context: Context,
+    preferredSource: String = Prefs.SOURCE_AUTO,
+    private val sampleRate: Int = Prefs.SAMPLE_RATES.first(),
+) {
 
     data class Result(val file: File, val source: String, val durationMs: Long)
+
+    /** AUTO ise tüm zincir, değilse yalnızca seçilen kaynak (sessiz de olsa kullanılır). */
+    private val sources = if (preferredSource == Prefs.SOURCE_AUTO) {
+        SOURCES
+    } else {
+        SOURCES.filter { it.first == preferredSource }.ifEmpty { SOURCES }
+    }
 
     private val handler = Handler(Looper.getMainLooper())
     private var recorder: MediaRecorder? = null
@@ -57,15 +68,15 @@ class CallRecorder(private val context: Context) {
 
     private fun startFrom(index: Int): Boolean {
         val output = file ?: return false
-        for (i in index until SOURCES.size) {
-            val (name, source) = SOURCES[i]
+        for (i in index until sources.size) {
+            val (name, source) = sources[i]
             val r = newMediaRecorder()
             try {
                 r.setAudioSource(source)
                 r.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
                 r.setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
                 r.setAudioChannels(1)
-                r.setAudioSamplingRate(SAMPLE_RATE)
+                r.setAudioSamplingRate(sampleRate)
                 r.setAudioEncodingBitRate(BIT_RATE)
                 r.setOutputFile(output.absolutePath)
                 r.prepare()
@@ -76,7 +87,7 @@ class CallRecorder(private val context: Context) {
                 startedAtElapsed = SystemClock.elapsedRealtime()
                 Log.i(TAG, "Kayıt başladı, kaynak=$name")
                 // Son kaynakta sessizlik kontrolü yapılmaz: sessiz de olsa kayıt alınır.
-                if (i < SOURCES.lastIndex) scheduleSilenceCheck(r)
+                if (i < sources.lastIndex) scheduleSilenceCheck(r)
                 return true
             } catch (e: Exception) {
                 Log.w(TAG, "Kaynak $name kullanılamadı: ${e.message}")
@@ -122,7 +133,6 @@ class CallRecorder(private val context: Context) {
 
     companion object {
         private const val TAG = CallRecorderModule.TAG
-        private const val SAMPLE_RATE = 16_000
         private const val BIT_RATE = 64_000
         private const val SILENCE_CHECKS = 8
         private const val SILENCE_INTERVAL_MS = 250L
@@ -133,6 +143,8 @@ class CallRecorder(private val context: Context) {
             "VOICE_RECOGNITION" to MediaRecorder.AudioSource.VOICE_RECOGNITION,
             "MIC" to MediaRecorder.AudioSource.MIC,
         )
+
+        val SOURCE_NAMES: List<String> = SOURCES.map { it.first }
 
         /** Kayıt başladığı andaki ses yolu (CLAUDE.md §2.2). Arama içinde değişirse yansımaz. */
         fun detectAudioRoute(context: Context): String {

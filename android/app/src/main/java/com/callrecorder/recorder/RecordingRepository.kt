@@ -3,6 +3,7 @@ package com.callrecorder.recorder
 import android.content.Context
 import android.os.Build
 import android.os.Environment
+import android.util.Log
 import org.json.JSONObject
 import java.io.File
 import java.text.SimpleDateFormat
@@ -31,9 +32,32 @@ data class RecordingMeta(
         .put("sizeBytes", sizeBytes)
         .put("audioSource", audioSource)
         .put("audioRoute", audioRoute)
+
+    companion object {
+        fun fromJson(o: JSONObject) = RecordingMeta(
+            id = o.getString("id"),
+            number = if (o.isNull("number")) null else o.optString("number"),
+            direction = o.optString("direction", "unknown"),
+            startedAt = o.getLong("startedAt"),
+            durationMs = o.optLong("durationMs"),
+            sizeBytes = o.optLong("sizeBytes"),
+            audioSource = o.optString("audioSource", "MIC"),
+            audioRoute = o.optString("audioRoute", "unknown"),
+        )
+    }
 }
 
-/** Kayıt dosyalarının okunup yazıldığı tek yer. Faz 2'de listeleme/silme eklenecek. */
+/** Servisten (kayıt kaydedildi) RN modülüne olay aktarımı; modül yoksa olay düşer. */
+object RecordingEvents {
+    @Volatile
+    var onSaved: ((RecordingMeta) -> Unit)? = null
+
+    fun saved(meta: RecordingMeta) {
+        onSaved?.invoke(meta)
+    }
+}
+
+/** Kayıt dosyalarının okunup yazıldığı ve silindiği tek yer. */
 class RecordingRepository(context: Context) {
 
     val dir: File = run {
@@ -52,6 +76,30 @@ class RecordingRepository(context: Context) {
 
     fun audioFile(id: String): File = File(dir, "$id.m4a")
 
+    /** JSON'u olan ve ses dosyası duran kayıtlar, en yeni önce. Bozuk JSON atlanır. */
+    fun list(): List<RecordingMeta> =
+        dir.listFiles { f -> f.name.endsWith(".json") }.orEmpty()
+            .mapNotNull { file ->
+                try {
+                    RecordingMeta.fromJson(JSONObject(file.readText()))
+                        .takeIf { audioFile(it.id).exists() }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Meta veri okunamadı: ${file.name}: ${e.message}")
+                    null
+                }
+            }
+            .sortedByDescending { it.startedAt }
+
+    /** Ses ve meta dosyasını siler; kayıt bulunamazsa false döner. */
+    fun delete(id: String): Boolean {
+        val audio = audioFile(id)
+        val json = File(dir, "$id.json")
+        if (!audio.exists() && !json.exists()) return false
+        audio.delete()
+        json.delete()
+        return true
+    }
+
     /** Önce geçici dosyaya yazar, sonra yeniden adlandırır: yarım JSON kalmaz. */
     fun saveMetadata(meta: RecordingMeta) {
         val target = File(dir, "${meta.id}.json")
@@ -61,5 +109,9 @@ class RecordingRepository(context: Context) {
             tmp.delete()
             throw java.io.IOException("Meta veri yazılamadı: ${target.name}")
         }
+    }
+
+    companion object {
+        private const val TAG = CallRecorderModule.TAG
     }
 }
