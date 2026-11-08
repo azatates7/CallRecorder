@@ -25,9 +25,7 @@ class CallRecorderModule(reactContext: ReactApplicationContext) :
     private val repository by lazy { RecordingRepository(reactApplicationContext) }
     private val prefs by lazy { Prefs(reactApplicationContext) }
     private val player by lazy { RecordingPlayer(::emit) }
-    private val savedListener: (RecordingMeta) -> Unit = { meta ->
-        emit("recordingSaved", toMap(meta, ContactNameResolver(reactApplicationContext)))
-    }
+    private val savedListener: (RecordingMeta) -> Unit = { meta -> emit("recordingSaved", toMap(meta)) }
 
     override fun getName(): String = NAME
 
@@ -100,7 +98,6 @@ class CallRecorderModule(reactContext: ReactApplicationContext) :
             promise.resolve(
                 Arguments.createMap().apply {
                     putBoolean("monitoring", CallMonitorService.isRunning)
-                    putBoolean("accessibilityEnabled", KeepAliveAccessibilityService.isEnabled(ctx))
                     putBoolean("ignoringBatteryOptimizations", power.isIgnoringBatteryOptimizations(ctx.packageName))
                     putMap("permissions", permissions)
                 },
@@ -108,11 +105,6 @@ class CallRecorderModule(reactContext: ReactApplicationContext) :
         } catch (e: Exception) {
             promise.reject("E_SERVICE", e.message, e)
         }
-    }
-
-    @ReactMethod
-    fun openAccessibilitySettings(promise: Promise) {
-        launch(promise, Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
     }
 
     /** Kalıcı reddedilen izinler ve Android 13+ "kısıtlı ayarlar" için uygulama bilgisi ekranı. */
@@ -184,8 +176,7 @@ class CallRecorderModule(reactContext: ReactApplicationContext) :
     fun listRecordings(promise: Promise) {
         try {
             val array = Arguments.createArray()
-            val names = ContactNameResolver(reactApplicationContext)
-            repository.list().forEach { array.pushMap(toMap(it, names)) }
+            repository.list().forEach { array.pushMap(toMap(it)) }
             promise.resolve(array)
         } catch (e: Exception) {
             promise.reject("E_IO", e.message, e)
@@ -289,12 +280,11 @@ class CallRecorderModule(reactContext: ReactApplicationContext) :
         if (ctx.hasActiveReactInstance()) ctx.emitDeviceEvent(name, params)
     }
 
-    private fun toMap(meta: RecordingMeta, names: ContactNameResolver): WritableMap = Arguments.createMap().apply {
+    private fun toMap(meta: RecordingMeta): WritableMap = Arguments.createMap().apply {
         putString("id", meta.id)
         putString("filePath", repository.audioFile(meta.id).absolutePath)
         if (meta.number != null) putString("number", meta.number) else putNull("number")
-        val name = names.nameFor(meta.number)
-        if (name != null) putString("name", name) else putNull("name")
+        putNull("name") // READ_CONTACTS çıkarıldı (Play uyumu, CLAUDE.md §14)
         putString("direction", meta.direction)
         putDouble("startedAt", meta.startedAt.toDouble())
         putDouble("durationMs", meta.durationMs.toDouble())
@@ -316,8 +306,6 @@ class CallRecorderModule(reactContext: ReactApplicationContext) :
         private val STATUS_PERMISSIONS = listOf(
             Triple("RECORD_AUDIO", Manifest.permission.RECORD_AUDIO, 1),
             Triple("READ_PHONE_STATE", Manifest.permission.READ_PHONE_STATE, 1),
-            Triple("READ_CALL_LOG", Manifest.permission.READ_CALL_LOG, 1),
-            Triple("READ_CONTACTS", Manifest.permission.READ_CONTACTS, 1),
             Triple("POST_NOTIFICATIONS", Manifest.permission.POST_NOTIFICATIONS, Build.VERSION_CODES.TIRAMISU),
         )
     }

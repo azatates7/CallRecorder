@@ -8,7 +8,6 @@ interface CallRecorderNative {
   startMonitoring(): Promise<void>;
   stopMonitoring(): Promise<void>;
   getStatus(): Promise<ServiceStatus>;
-  openAccessibilitySettings(): Promise<void>;
   openAppSettings(): Promise<void>;
   requestIgnoreBatteryOptimizations(): Promise<void>;
   getSettings(): Promise<RecorderSettings>;
@@ -49,7 +48,6 @@ export const CallRecorder = {
   startMonitoring: () => call(n => n.startMonitoring()),
   stopMonitoring: () => call(n => n.stopMonitoring()),
   getStatus: () => call(n => n.getStatus()),
-  openAccessibilitySettings: () => call(n => n.openAccessibilitySettings()),
   openAppSettings: () => call(n => n.openAppSettings()),
   requestIgnoreBatteryOptimizations: () => call(n => n.requestIgnoreBatteryOptimizations()),
   getSettings: () => call(n => n.getSettings()),

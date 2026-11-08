@@ -8,7 +8,7 @@ export interface Recording {
   id: string;
   filePath: string;
   number: string | null;
-  /** Rehberdeki kişi adı; izin yoksa veya kayıtlı değilse null. */
+  /** Rehberdeki kişi adı. Bu sürümde READ_CONTACTS çıkarıldığı için her zaman null (CLAUDE.md §14). */
   name: string | null;
   direction: Direction;
   startedAt: number; // epoch ms
@@ -25,16 +25,10 @@ export interface PlaybackProgress {
 }
 
 /** Durum ekranında gösterilen çalışma zamanı izinleri (PermissionsAndroid anahtarlarıyla aynı). */
-export type PermissionKey =
-  | 'RECORD_AUDIO'
-  | 'READ_PHONE_STATE'
-  | 'READ_CALL_LOG'
-  | 'READ_CONTACTS'
-  | 'POST_NOTIFICATIONS';
+export type PermissionKey = 'RECORD_AUDIO' | 'READ_PHONE_STATE' | 'POST_NOTIFICATIONS';
 
 export interface ServiceStatus {
   monitoring: boolean;
-  accessibilityEnabled: boolean;
   ignoringBatteryOptimizations: boolean;
   permissions: Record<PermissionKey, 'granted' | 'denied'>;
 }

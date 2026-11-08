@@ -5,7 +5,6 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
-import android.content.pm.ApplicationInfo
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
@@ -28,13 +27,11 @@ class CallMonitorService : Service() {
     private var callback: Any? = null // API 31+: TelephonyCallback, altı: PhoneStateListener
     private var lastState = TelephonyManager.CALL_STATE_IDLE
     private var direction = "unknown"
-    private var ringingAt = 0L
 
     /** Süren aramanın kayıt bilgisi; arama yokken null. */
     private data class Session(
         val id: String,
         val startedAt: Long,
-        val lookupSince: Long,
         val direction: String,
         val audioRoute: String,
     )
@@ -42,8 +39,7 @@ class CallMonitorService : Service() {
     private var recorder: CallRecorder? = null
     private var session: Session? = null
     private val repository by lazy { RecordingRepository(this) }
-    private val callLogResolver by lazy { CallLogResolver(this) }
-    // Arama geçmişi beklemesi ve dosya yazma ana thread'i bloklamasın diye
+    // Dosya yazma ana thread'i bloklamasın diye
     private val io: ExecutorService = Executors.newSingleThreadExecutor()
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -141,7 +137,6 @@ class CallMonitorService : Service() {
         when (state) {
             TelephonyManager.CALL_STATE_RINGING -> {
                 direction = "incoming"
-                ringingAt = System.currentTimeMillis()
                 Log.i(TAG, "RINGING — gelen arama")
             }
             TelephonyManager.CALL_STATE_OFFHOOK -> {
@@ -158,7 +153,6 @@ class CallMonitorService : Service() {
                     TelephonyManager.CALL_STATE_RINGING -> Log.i(TAG, "IDLE — cevapsız/reddedilen arama, kayıt yok")
                 }
                 direction = "unknown"
-                ringingAt = 0L
             }
         }
         lastState = state
@@ -177,12 +171,11 @@ class CallMonitorService : Service() {
         val rec = CallRecorder(this, prefs.preferredSource, prefs.sampleRate)
         if (!rec.start(repository.audioFile(id))) return
         recorder = rec
-        // Arama geçmişi gelen aramayı çalma anıyla, gideni arama başlangıcıyla kaydeder
-        val reference = if (direction == "incoming" && ringingAt > 0) ringingAt else now
+        // Yön RINGING/OFFHOOK sırasından belirlenir. Numara READ_CALL_LOG çıkarıldığı için
+        // alınmıyor (Play uyumu, CLAUDE.md §14); meta.number = null.
         session = Session(
             id = id,
             startedAt = now,
-            lookupSince = reference - LOOKUP_TOLERANCE_MS,
             direction = direction,
             audioRoute = CallRecorder.detectAudioRoute(this),
         )
@@ -200,11 +193,10 @@ class CallMonitorService : Service() {
             return
         }
         io.execute {
-            val entry = callLogResolver.resolve(s.lookupSince)
             val meta = RecordingMeta(
                 id = s.id,
-                number = entry?.number,
-                direction = entry?.direction?.takeIf { it != "unknown" } ?: s.direction,
+                number = null, // READ_CALL_LOG çıkarıldı (Play uyumu, CLAUDE.md §14)
+                direction = s.direction,
                 startedAt = s.startedAt,
                 durationMs = result.durationMs,
                 sizeBytes = result.file.length(),
@@ -215,22 +207,18 @@ class CallMonitorService : Service() {
                 repository.saveMetadata(meta)
                 RecordingEvents.saved(meta) // uygulama açıksa liste yenilenir
                 Log.i(TAG, "Kayıt kaydedildi: ${s.id}.m4a, süre=${meta.durationMs / 1000} sn, kaynak=${meta.audioSource}, yön=${meta.direction}")
-                if (isDebuggable()) Log.d(TAG, "Numara: ${meta.number}")
             } catch (e: Exception) {
                 Log.e(TAG, "Meta veri yazılamadı", e)
             }
         }
     }
 
-    private fun isDebuggable(): Boolean =
-        (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
 
     companion object {
         private const val TAG = CallRecorderModule.TAG
         private const val CHANNEL_ID = "call_monitor"
         private const val NOTIFICATION_ID = 1001
         private const val MIN_DURATION_MS = 1_000L
-        private const val LOOKUP_TOLERANCE_MS = 5_000L
 
         @Volatile
         var isRunning = false

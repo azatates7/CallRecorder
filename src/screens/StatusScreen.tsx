@@ -18,8 +18,6 @@ import { formatBytes } from '../utils/format';
 const PERMISSION_ROWS: { key: PermissionKey; title: string; why: string }[] = [
   { key: 'RECORD_AUDIO', title: 'Mikrofon', why: 'Arama sesini kaydetmek için.' },
   { key: 'READ_PHONE_STATE', title: 'Telefon durumu', why: 'Aramanın ne zaman başlayıp bittiğini anlamak için.' },
-  { key: 'READ_CALL_LOG', title: 'Arama geçmişi', why: 'Kayda numarayı ve yönü eklemek için.' },
-  { key: 'READ_CONTACTS', title: 'Kişiler (isteğe bağlı)', why: 'Kayıtlarda numaranın yanında kişi adını göstermek için.' },
   { key: 'POST_NOTIFICATIONS', title: 'Bildirim', why: 'Kaydın çalıştığını ve sorunları göstermek için.' },
 ];
 
@@ -136,19 +134,6 @@ export default function StatusScreen() {
         actionLabel="Düzelt"
         onAction={() => run(CallRecorder.requestIgnoreBatteryOptimizations)}
       />
-      <CheckRow
-        ok={status.accessibilityEnabled}
-        title="Erişilebilirlik servisi"
-        why="Android 10+'da arama sırasında mikrofonun kapatılmaması için. Ekranı okumaz."
-        actionLabel="Aç"
-        onAction={() => run(CallRecorder.openAccessibilitySettings)}
-      />
-      {!status.accessibilityEnabled ? (
-        <Text style={styles.note}>
-          Anahtar gri ve açılamıyorsa: Ayarlar › Uygulamalar › CallRecorder › sağ üstteki ⋮ › "Kısıtlı
-          ayarlara izin ver" seçeneğini açıp tekrar deneyin.
-        </Text>
-      ) : null}
 
       <Text style={styles.section}>Kayıt</Text>
       <View style={styles.switchRow}>
@@ -190,7 +175,8 @@ export default function StatusScreen() {
       <Text style={styles.section}>Kayıtlar</Text>
       <Text style={styles.body}>
         {recordings.length} kayıt · {formatBytes(totalBytes)}. Kayıtlar yalnızca bu telefonda tutulur;
-        uygulama silinirse kayıtlar da silinir.
+        uygulama silinirse kayıtlar da silinir. Bu sürümde kayıtlarda numara ve kişi adı gösterilmez,
+        yalnızca aramanın yönü ve saati tutulur.
       </Text>
 
       <Text style={styles.section}>Bilinmesi gerekenler</Text>
@@ -212,7 +198,6 @@ const styles = StyleSheet.create({
   checkMark: { fontSize: 18, width: 28, fontWeight: '700' },
   checkTitle: { fontSize: 16, color: '#111' },
   hint: { fontSize: 13, color: '#666', marginTop: 2 },
-  note: { fontSize: 13, color: '#8a5a00', marginLeft: 28, marginBottom: 4 },
   action: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6, backgroundColor: '#1976d2' },
   actionText: { color: '#fff', fontWeight: '600' },
   switchRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8 },

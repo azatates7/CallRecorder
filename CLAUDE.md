@@ -2,13 +2,15 @@
 
 Bu dosya, projeyi sıfırdan kuracak ve geliştirecek Claude Code oturumları için tek referanstır. Kararlar burada; bir kararı değiştirmeden önce gerekçesini yaz ve bu dosyayı güncelle.
 
+> **DİKKAT — mevcut durum:** Uygulama şu an **Play uyumlu, sade sürüm**. Erişilebilirlik servisi, `READ_CALL_LOG` ve kişi adları (`READ_CONTACTS`) **çıkarıldı**. §2.3, §2.6, §6, §7, §8, §9-Faz3/4 bu özellikleri anlatır ama **artık kodda yoklar**. Neyin neden çıkarıldığı ve nasıl geri getirileceği **§14'te**. Sideload (kişisel kullanım) için bu üçünü geri eklemek gerekebilir.
+
 ## 1. Amaç ve kapsam
 
 Telefonda **gelen ve giden aramaları otomatik olarak** cihazın yerel depolamasına ses dosyası olarak kaydeden, kayıtları daha sonra listeleyip dinleyebileceğim, paylaşabileceğim ve silebileceğim **basit, tamamen çevrimdışı** bir Android uygulaması.
 
 **Kapsam içi (MVP):**
 - Arama başladığında otomatik kayıt, bittiğinde otomatik durdurma
-- Kayıt meta verisi: numara, yön (gelen/giden), başlangıç zamanı, süre; listede rehberdeki kişi adı (yoksa "Bilinmeyen kişi")
+- Kayıt meta verisi: yön (gelen/giden), başlangıç zamanı, süre (numara ve kişi adı bu sürümde yok — §14)
 - Kayıt listesi (tarihe göre gruplu, gelen/giden filtresi, numaraya göre arama)
 - Oynatma (oynat/duraklat/ileri-geri sarma), paylaşma, silme
 - Durum/Ayarlar ekranı: izin kontrol listesi, servis durumu, otomatik kayıt aç/kapa, ses kaynağı seçimi
@@ -27,10 +29,10 @@ Bu bölüm tasarımın tamamını belirler; "neden böyle yaptık" sorusunun cev
    - Kendi sesim her zaman net kaydedilir.
    - Karşı tarafın sesi, ahize/hoparlörden mikrofona sızdığı ölçüde kaydedilir; **hoparlör modunda** en iyi sonuç alınır. Kalite cihaza göre değişir.
    - **Kulaklık (kablolu/Bluetooth) takılıyken karşı tarafın sesi fiziksel olarak mikrofona ulaşmaz.** "Kulaklıktan bağımsız tam iki taraflı kayıt" root/sistem uygulaması olmadan **garanti edilemez**. Uygulama yine de kayıt alır (kendi sesim + varsa sızan ses) ve bu durumu kayıt meta verisinde `audioRoute` ile işaretler. Bunu kullanıcıdan saklama; Durum ekranında kısa bir açıklama göster.
-3. **Android 10+ eşzamanlı mikrofon erişimi:** Arama sırasında arka plandaki bir uygulama mikrofonu normalde alamaz. Çalışan bir **AccessibilityService**'i olan uygulamalar bu kuralda istisnadır (Cube ACR vb. bu yolu kullanır). Bu yüzden projede **olay işlemeyen, minimal bir AccessibilityService** bulunur; tek görevi süreci "kullanıcıya yardımcı servis" statüsünde tutmaktır. Kullanıcı bunu Ayarlar > Erişilebilirlik'ten elle açar. Bu servis Play Store politikalarıyla çelişir → sideload dağıtımın bir nedeni de budur.
+3. **Android 10+ eşzamanlı mikrofon erişimi:** _(Bu sürümde erişilebilirlik servisi Play uyumu için çıkarıldı — §14. Aşağıdaki, sideload sürümünde geçerli olan tasarımdır.)_ Arama sırasında arka plandaki bir uygulama mikrofonu normalde alamaz. Çalışan bir **AccessibilityService**'i olan uygulamalar bu kuralda istisnadır (Cube ACR vb. bu yolu kullanır). Bu yüzden projede **olay işlemeyen, minimal bir AccessibilityService** bulunur; tek görevi süreci "kullanıcıya yardımcı servis" statüsünde tutmaktır. Kullanıcı bunu Ayarlar > Erişilebilirlik'ten elle açar. Bu servis Play Store politikalarıyla çelişir → sideload dağıtımın bir nedeni de budur.
 4. **Ön plan servisi (Foreground Service) zorunludur.** Arka planda mikrofon erişimi için `foregroundServiceType="microphone"`. Android 11+ "while-in-use" kuralı gereği mikrofon tipli FGS **uygulama ön plandayken başlatılmalıdır** → servis kullanıcı uygulamayı açıp "Otomatik kayıt"ı etkinleştirdiğinde başlar ve kalıcı bildirimle sürekli çalışır (arama başına servis başlatılmaz).
 5. **Yeniden başlatma sonrası:** `BOOT_COMPLETED` üzerinden mikrofon tipli FGS başlatmak yeni Android sürümlerinde kısıtlıdır. Strateji: boot'ta servisi başlatmayı dene; başarısız olursa "Kayıt için uygulamayı bir kez açın" bildirimi göster. Erişilebilirlik servisi aktifken davranışı **gerçek cihazda doğrula** (§10).
-6. **Giden arama numarası:** Android 9+ ile numara `READ_CALL_LOG` olmadan gelmez. Yaklaşım: arama bitince (`IDLE`) `CallLog`'dan son kaydı oku, zaman damgasıyla eşleştir; numara/yön/süre buradan alınır. Kayıt sırasında numara bilinmiyorsa geçici dosya adı kullanılır, sonra meta veri güncellenir.
+6. **Giden arama numarası:** _(Bu sürümde `READ_CALL_LOG` çıkarıldı — §14; numara hiç alınmıyor, meta.number = null.)_ Android 9+ ile numara `READ_CALL_LOG` olmadan gelmez. Yaklaşım: arama bitince (`IDLE`) `CallLog`'dan son kaydı oku, zaman damgasıyla eşleştir; numara/yön/süre buradan alınır. Kayıt sırasında numara bilinmiyorsa geçici dosya adı kullanılır, sonra meta veri güncellenir.
 7. **Pil optimizasyonu:** Xiaomi/Samsung/Huawei gibi üreticiler servisi öldürebilir. Durum ekranında `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` için yönlendirme olur.
 
 ## 3. Teknoloji kararları
@@ -154,17 +156,17 @@ play(id: string): Promise<void>; pause(): Promise<void>; seekTo(ms: number): Pro
 
 ## 7. İzinler (AndroidManifest)
 
-- `RECORD_AUDIO`, `READ_PHONE_STATE`, `READ_CALL_LOG`
-- `READ_CONTACTS` (isteğe bağlı: yalnızca kişi adı gösterimi; verilmezse kayıt etkilenmez)
+- `RECORD_AUDIO`, `READ_PHONE_STATE`
+- ~~`READ_CALL_LOG`~~, ~~`READ_CONTACTS`~~ → Play uyumu için çıkarıldı (§14)
 - `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_MICROPHONE` (API 34+)
 - `POST_NOTIFICATIONS` (API 33+)
 - `RECEIVE_BOOT_COMPLETED`
 - `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`
 - `<service android:foregroundServiceType="microphone">`
-- AccessibilityService: `BIND_ACCESSIBILITY_SERVICE` permission ile, `accessibility_service.xml` içinde hiçbir olay türü dinlenmez (`accessibilityEventTypes` minimum), açıklama metni amacını dürüstçe anlatır.
+- ~~AccessibilityService~~ → Play uyumu için çıkarıldı (§14).
 - **`INTERNET` ana manifest'te yok.** Yalnızca debug'da Metro bağlantısı için `android/app/src/debug/AndroidManifest.xml`'de tanımlı; release APK'da bulunmaz.
 
-İzin isteme sırası (Durum ekranında adım adım, her biri neden gerektiğini tek cümleyle açıklar): Mikrofon → Telefon durumu → Arama kaydı → Kişiler → Bildirim → Pil optimizasyonu → Erişilebilirlik.
+İzin isteme sırası (Durum ekranında adım adım): Mikrofon → Telefon durumu → Bildirim → Pil optimizasyonu. (Arama kaydı, Kişiler ve Erişilebilirlik bu sürümde yok — §14.)
 
 ## 8. UI
 
@@ -199,6 +201,7 @@ play(id: string): Promise<void>; pause(): Promise<void>; seekTo(ms: number): Pro
    - `recordingStarted`/`recordingFailed` olayları sözleşmeden çıkarıldı: arayüz kullanmıyor, hatalar logcat'te.
    - **4b:** Kişi adları. `ContactNameResolver` her listelemede `PhoneLookup` ile adı bulur (ad JSON'a yazılmaz; rehber değişiklikleri eski kayıtlara yansır). Satırda üstte ad (yoksa "Bilinmeyen kişi", italik), altta numara · saat. Arama isimde de çalışır; klavye artık yalnızca rakam değil.
    - Açık (karar bekliyor): otomatik silme (X günden eski), metinlerin `src/strings.ts`'e toplanması.
+6. **Faz 5 — Play uyumu (sade sürüm):** Erişilebilirlik servisi, `READ_CALL_LOG`, `READ_CONTACTS`/kişi adları çıkarıldı. Ayrıntı ve geri getirme §14. ✅
 
 Her faz sonunda: gerçek cihazda §10 kontrol listesinin ilgili maddeleri.
 
@@ -250,3 +253,24 @@ Sürümler (kurulumdaki varsayılanlar): RN `____` (package.json'dan doldur), mi
 ## 13. Yasal not
 
 Türkiye'de görüşme kaydı KVKK ve TCK kapsamında değerlendirilebilir; kayıtlar yalnızca kişisel kullanım içindir ve karşı tarafı bilgilendirmek kullanıcının sorumluluğundadır. Uygulama ilk açılışta bunu tek ekranlık bir bilgilendirme ile gösterir (bir kez, onaylanınca tekrar gösterilmez).
+
+## 14. Play uyumu için çıkarılanlar (go-live notu)
+
+Bu bölüm, uygulamanın Google Play politikalarına uyması için tek sürümden **tamamen çıkarılan** üç özelliği ve bunların nasıl geri getirileceğini anlatır. Üçü de Play tarafından reddedilme nedeniydi (bkz. aşağıdaki gerekçeler).
+
+**Çıkarılanlar ve neden:**
+1. **Erişilebilirlik servisi** (`KeepAliveAccessibilityService.kt`, manifest `<service>`, `res/xml/accessibility_service.xml`, `strings.xml`'deki `accessibility_label`/`accessibility_description`, Durum ekranındaki satır). → Play, erişilebilirlik API'sinin arama kaydı için kullanılmasını açıkça yasaklıyor.
+2. **`READ_CALL_LOG`** (`CallLogResolver.kt`, manifest izni, servis içinde numara/yön eşleştirme). → Kısıtlı izin; yalnızca varsayılan arayıcı uygulamalara verilir.
+3. **Kişi adları / `READ_CONTACTS`** (`ContactNameResolver.kt`, manifest izni). → 2 çıkınca numara hep null olduğundan isim de bulunamaz; kullanılmayan hassas izin reviewer için risk. Bu yüzden 2 ile birlikte çıkarıldı.
+
+**Davranışa etkisi (sade sürüm):**
+- Android 10+ cihazlarda arama sırasında mikrofon susturulabilir → **kayıt sessiz çıkabilir**. Root dışı çözüm yok; bu, erişilebilirlik servisinin çıkarılmasının bedeli.
+- `meta.number` her zaman `null`, `name` her zaman `null`. Yön (`direction`) hâlâ RINGING/OFFHOOK sırasından belirlenir. Liste/oynatıcıda "Bilinmeyen kişi" / "Bilinmeyen numara" görünür.
+- `Recording` sözleşmesindeki `number`/`name` alanları **korundu** (hep null); geri getirme kolay olsun diye UI'a dokunulmadı.
+
+**Geri getirme (sideload / kişisel kullanım için):** En temizi git geçmişinden "Faz 4b" commit'ini referans almak. Elle yapılacaksa üçü birbirine bağlı, şu sırayla:
+1. `READ_CALL_LOG`: `CallLogResolver.kt`'yi geri ekle, manifest'e izni ekle, `CallMonitorService.stopRecording`'de `callLogResolver.resolve(...)` ile numara/yönü doldur (git'teki eski sürüm), `STATUS_PERMISSIONS` ve `PERMISSION_ROWS`'a `READ_CALL_LOG` ekle, `PermissionKey`'e geri koy.
+2. `READ_CONTACTS` + isim: `ContactNameResolver.kt`'yi geri ekle, manifest izni, `toMap`'te `names.nameFor(...)` ile `name` doldur, listRecordings/savedListener'da `ContactNameResolver` örneğini geç, izin satırı + `PermissionKey`.
+3. Erişilebilirlik: `KeepAliveAccessibilityService.kt` + `res/xml/accessibility_service.xml` + `strings.xml` metinleri + manifest `<service>` geri; `getStatus`'a `accessibilityEnabled`, modüle `openAccessibilitySettings`, `ServiceStatus`'a alan, Durum ekranına CheckRow + "Kısıtlı ayarlar" notu geri.
+
+**Play yayını için kalan adımlar (sade sürümle):** `assembleRelease` yerine **AAB**: `.\gradlew bundleRelease` → `android/app/build/outputs/bundle/release/app-release.aab`. Play Console (25 USD, tek sefer), Play App Signing, store listesi, veri güvenliği formu, içerik derecelendirmesi, mikrofon ön plan servisi türü için beyan+gerekçe. `RECORD_AUDIO` + mikrofon FGS gerekçeli olarak kabul edilir.
