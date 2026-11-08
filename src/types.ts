@@ -8,6 +8,8 @@ export interface Recording {
   id: string;
   filePath: string;
   number: string | null;
+  /** Rehberdeki kişi adı; izin yoksa veya kayıtlı değilse null. */
+  name: string | null;
   direction: Direction;
   startedAt: number; // epoch ms
   durationMs: number;
@@ -23,7 +25,12 @@ export interface PlaybackProgress {
 }
 
 /** Durum ekranında gösterilen çalışma zamanı izinleri (PermissionsAndroid anahtarlarıyla aynı). */
-export type PermissionKey = 'RECORD_AUDIO' | 'READ_PHONE_STATE' | 'READ_CALL_LOG' | 'POST_NOTIFICATIONS';
+export type PermissionKey =
+  | 'RECORD_AUDIO'
+  | 'READ_PHONE_STATE'
+  | 'READ_CALL_LOG'
+  | 'READ_CONTACTS'
+  | 'POST_NOTIFICATIONS';
 
 export interface ServiceStatus {
   monitoring: boolean;

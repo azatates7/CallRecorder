@@ -19,6 +19,7 @@ const PERMISSION_ROWS: { key: PermissionKey; title: string; why: string }[] = [
   { key: 'RECORD_AUDIO', title: 'Mikrofon', why: 'Arama sesini kaydetmek için.' },
   { key: 'READ_PHONE_STATE', title: 'Telefon durumu', why: 'Aramanın ne zaman başlayıp bittiğini anlamak için.' },
   { key: 'READ_CALL_LOG', title: 'Arama geçmişi', why: 'Kayda numarayı ve yönü eklemek için.' },
+  { key: 'READ_CONTACTS', title: 'Kişiler (isteğe bağlı)', why: 'Kayıtlarda numaranın yanında kişi adını göstermek için.' },
   { key: 'POST_NOTIFICATIONS', title: 'Bildirim', why: 'Kaydın çalıştığını ve sorunları göstermek için.' },
 ];
 

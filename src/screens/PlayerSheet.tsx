@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Alert, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { usePlayer } from '../hooks/usePlayer';
 import type { Recording } from '../types';
-import { formatDayTitle, formatDuration, formatNumber, formatTime } from '../utils/format';
+import { formatDayTitle, formatDuration, formatName, formatNumber, formatTime } from '../utils/format';
 
 const SKIP_MS = 10_000;
 
@@ -48,9 +48,10 @@ export default function PlayerSheet({ recording, onClose }: Props) {
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose} />
       <View style={styles.sheet}>
-        <Text style={styles.title}>{formatNumber(recording.number)}</Text>
+        <Text style={styles.title}>{formatName(recording.name)}</Text>
         <Text style={styles.subtitle}>
-          {formatDayTitle(recording.startedAt)} · {formatTime(recording.startedAt)}
+          {formatNumber(recording.number)} · {formatDayTitle(recording.startedAt)} ·{' '}
+          {formatTime(recording.startedAt)}
         </Text>
 
         <Pressable

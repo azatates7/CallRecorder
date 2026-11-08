@@ -46,6 +46,10 @@ export function formatDayTitle(epochMs: number, now: number = Date.now()): strin
   return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
 }
 
+export function formatName(name: string | null): string {
+  return name && name.trim() ? name : 'Bilinmeyen kişi';
+}
+
 export function formatNumber(number: string | null): string {
   return number && number.trim() ? number : 'Bilinmeyen numara';
 }

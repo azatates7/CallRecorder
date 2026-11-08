@@ -8,7 +8,7 @@ Telefonda **gelen ve giden aramaları otomatik olarak** cihazın yerel depolamas
 
 **Kapsam içi (MVP):**
 - Arama başladığında otomatik kayıt, bittiğinde otomatik durdurma
-- Kayıt meta verisi: numara, yön (gelen/giden), başlangıç zamanı, süre
+- Kayıt meta verisi: numara, yön (gelen/giden), başlangıç zamanı, süre; listede rehberdeki kişi adı (yoksa "Bilinmeyen kişi")
 - Kayıt listesi (tarihe göre gruplu, gelen/giden filtresi, numaraya göre arama)
 - Oynatma (oynat/duraklat/ileri-geri sarma), paylaşma, silme
 - Durum/Ayarlar ekranı: izin kontrol listesi, servis durumu, otomatik kayıt aç/kapa, ses kaynağı seçimi
@@ -17,7 +17,6 @@ Telefonda **gelen ve giden aramaları otomatik olarak** cihazın yerel depolamas
 - Backend, bulut yedekleme, hesap/giriş, analytics — **uygulama internete çıkmaz**, `INTERNET` izni eklenmez
 - iOS (iOS arama kaydına izin vermez) — `ios/`, `Gemfile`, `.bundle/` projeden kaldırıldı
 - Play Store dağıtımı (bkz. §2) — APK yan yükleme (sideload) ile kişisel kullanım
-- Kişi adları (READ_CONTACTS) → Faz 2'de opsiyonel
 
 ## 2. Android kısıtları — mimarinin nedeni (önce bunu oku)
 
@@ -85,6 +84,7 @@ CallRecorder/
         ├── CallRecorder.kt              # MediaRecorder sarmalayıcı + audio source fallback
         ├── RecordingRepository.kt       # .m4a + .json okuma/yazma/silme
         ├── CallLogResolver.kt           # arama sonrası numara/yön/süre eşleştirme
+        ├── ContactNameResolver.kt       # numara → rehberdeki ad (PhoneLookup)
         ├── RecordingPlayer.kt           # MediaPlayer sarmalayıcı (oynat/duraklat/atla, ilerleme olayları)
         ├── KeepAliveAccessibilityService.kt
         ├── BootReceiver.kt
@@ -103,6 +103,7 @@ interface Recording {
   id: string;               // yyyyMMdd_HHmmss_<rastgele4>
   filePath: string;
   number: string | null;
+  name: string | null;      // rehberden, her listelemede okunur; JSON'a yazılmaz
   direction: Direction;
   startedAt: number;        // epoch ms
   durationMs: number;
@@ -123,7 +124,7 @@ getStatus(): Promise<{
   monitoring: boolean;
   accessibilityEnabled: boolean;
   ignoringBatteryOptimizations: boolean;
-  permissions: Record<'RECORD_AUDIO' | 'READ_PHONE_STATE' | 'READ_CALL_LOG' | 'POST_NOTIFICATIONS', 'granted' | 'denied'>;
+  permissions: Record<'RECORD_AUDIO' | 'READ_PHONE_STATE' | 'READ_CALL_LOG' | 'READ_CONTACTS' | 'POST_NOTIFICATIONS', 'granted' | 'denied'>;
 }>
 openAccessibilitySettings(): Promise<void>
 openAppSettings(): Promise<void>                 // kalıcı reddedilen izinler, kısıtlı ayarlar
@@ -154,6 +155,7 @@ play(id: string): Promise<void>; pause(): Promise<void>; seekTo(ms: number): Pro
 ## 7. İzinler (AndroidManifest)
 
 - `RECORD_AUDIO`, `READ_PHONE_STATE`, `READ_CALL_LOG`
+- `READ_CONTACTS` (isteğe bağlı: yalnızca kişi adı gösterimi; verilmezse kayıt etkilenmez)
 - `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_MICROPHONE` (API 34+)
 - `POST_NOTIFICATIONS` (API 33+)
 - `RECEIVE_BOOT_COMPLETED`
@@ -162,7 +164,7 @@ play(id: string): Promise<void>; pause(): Promise<void>; seekTo(ms: number): Pro
 - AccessibilityService: `BIND_ACCESSIBILITY_SERVICE` permission ile, `accessibility_service.xml` içinde hiçbir olay türü dinlenmez (`accessibilityEventTypes` minimum), açıklama metni amacını dürüstçe anlatır.
 - **`INTERNET` ana manifest'te yok.** Yalnızca debug'da Metro bağlantısı için `android/app/src/debug/AndroidManifest.xml`'de tanımlı; release APK'da bulunmaz.
 
-İzin isteme sırası (Durum ekranında adım adım, her biri neden gerektiğini tek cümleyle açıklar): Mikrofon → Telefon durumu → Arama kaydı → Bildirim → Pil optimizasyonu → Erişilebilirlik.
+İzin isteme sırası (Durum ekranında adım adım, her biri neden gerektiğini tek cümleyle açıklar): Mikrofon → Telefon durumu → Arama kaydı → Kişiler → Bildirim → Pil optimizasyonu → Erişilebilirlik.
 
 ## 8. UI
 
@@ -195,7 +197,8 @@ play(id: string): Promise<void>; pause(): Promise<void>; seekTo(ms: number): Pro
 5. **Faz 4 — Cila:**
    - **4a:** Kayıtlar ekranında yön filtresi (Tümü/Gelen/Giden) + numara araması (rakamlar boşluk/+/tire farkı gözetmeden eşleşir); ilk açılış yasal bilgilendirmesi (`DisclaimerModal`, onay `Prefs.disclaimerAccepted`'da); `INTERNET` izni `src/debug/AndroidManifest.xml`'e taşındı; release APK kendi anahtarıyla imzalanır.
    - `recordingStarted`/`recordingFailed` olayları sözleşmeden çıkarıldı: arayüz kullanmıyor, hatalar logcat'te.
-   - Açık (karar bekliyor): kişi adları (READ_CONTACTS), otomatik silme (X günden eski), metinlerin `src/strings.ts`'e toplanması.
+   - **4b:** Kişi adları. `ContactNameResolver` her listelemede `PhoneLookup` ile adı bulur (ad JSON'a yazılmaz; rehber değişiklikleri eski kayıtlara yansır). Satırda üstte ad (yoksa "Bilinmeyen kişi", italik), altta numara · saat. Arama isimde de çalışır; klavye artık yalnızca rakam değil.
+   - Açık (karar bekliyor): otomatik silme (X günden eski), metinlerin `src/strings.ts`'e toplanması.
 
 Her faz sonunda: gerçek cihazda §10 kontrol listesinin ilgili maddeleri.
 

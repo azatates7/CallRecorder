@@ -3,7 +3,7 @@ import { Alert, Pressable, SectionList, StyleSheet, Text, TextInput, View } from
 import { useRecordings } from '../hooks/useRecordings';
 import { CallRecorder } from '../native/CallRecorder';
 import type { Direction, Recording } from '../types';
-import { dayKey, formatDayTitle, formatDuration, formatNumber, formatTime } from '../utils/format';
+import { dayKey, formatDayTitle, formatDuration, formatName, formatNumber, formatTime } from '../utils/format';
 import PlayerSheet from './PlayerSheet';
 
 type Filter = 'all' | Exclude<Direction, 'unknown'>;
@@ -16,14 +16,15 @@ const FILTERS: { value: Filter; label: string }[] = [
 
 const digitsOf = (s: string) => s.replace(/\D/g, '');
 
-/** Yön filtresi + numara araması. Rakamlar boşluk/tire/+ farkı gözetmeden karşılaştırılır. */
+/** Yön filtresi + isim/numara araması. Rakamlar boşluk/tire/+ farkı gözetmeden karşılaştırılır. */
 function matches(r: Recording, filter: Filter, query: string): boolean {
   if (filter !== 'all' && r.direction !== filter) return false;
   const q = query.trim();
   if (!q) return true;
   const qDigits = digitsOf(q);
   if (qDigits) return digitsOf(r.number ?? '').includes(qDigits);
-  return formatNumber(r.number).toLocaleLowerCase('tr').includes(q.toLocaleLowerCase('tr'));
+  const text = `${formatName(r.name)} ${formatNumber(r.number)}`.toLocaleLowerCase('tr');
+  return text.includes(q.toLocaleLowerCase('tr'));
 }
 
 interface Section {
@@ -63,7 +64,7 @@ export default function RecordingsScreen() {
   const filtering = filter !== 'all' || query.trim() !== '';
 
   const confirmDelete = (r: Recording) => {
-    Alert.alert('Kaydı sil', `${formatNumber(r.number)} · ${formatTime(r.startedAt)} silinsin mi?`, [
+    Alert.alert('Kaydı sil', `${r.name ?? formatNumber(r.number)} · ${formatTime(r.startedAt)} silinsin mi?`, [
       { text: 'Vazgeç', style: 'cancel' },
       {
         text: 'Sil',
@@ -76,7 +77,7 @@ export default function RecordingsScreen() {
   };
 
   const showActions = (r: Recording) => {
-    Alert.alert(formatNumber(r.number), `${formatDayTitle(r.startedAt)} · ${formatTime(r.startedAt)}`, [
+    Alert.alert(formatName(r.name), `${formatNumber(r.number)}\n${formatDayTitle(r.startedAt)} · ${formatTime(r.startedAt)}`, [
       {
         text: 'Paylaş',
         onPress: () => {
@@ -96,9 +97,9 @@ export default function RecordingsScreen() {
           style={styles.search}
           value={query}
           onChangeText={setQuery}
-          placeholder="Numara ara"
+          placeholder="İsim veya numara ara"
           placeholderTextColor="#999"
-          keyboardType="phone-pad"
+          autoCorrect={false}
           clearButtonMode="while-editing"
         />
         <View style={styles.filters}>
@@ -128,8 +129,10 @@ export default function RecordingsScreen() {
               {item.direction === 'incoming' ? '↙' : item.direction === 'outgoing' ? '↗' : '•'}
             </Text>
             <View style={styles.rowText}>
-              <Text style={styles.number}>{formatNumber(item.number)}</Text>
-              <Text style={styles.meta}>{formatTime(item.startedAt)}</Text>
+              <Text style={[styles.name, !item.name && styles.unknown]}>{formatName(item.name)}</Text>
+              <Text style={styles.meta}>
+                {formatNumber(item.number)} · {formatTime(item.startedAt)}
+              </Text>
             </View>
             <Text style={styles.duration}>{formatDuration(item.durationMs)}</Text>
           </Pressable>
@@ -194,7 +197,8 @@ const styles = StyleSheet.create({
   incoming: { color: '#2e7d32' },
   outgoing: { color: '#1976d2' },
   rowText: { flex: 1 },
-  number: { fontSize: 16, color: '#111' },
+  name: { fontSize: 16, color: '#111' },
+  unknown: { color: '#777', fontStyle: 'italic' },
   meta: { fontSize: 13, color: '#666', marginTop: 2 },
   duration: { fontSize: 14, color: '#444', fontVariant: ['tabular-nums'] },
   emptyContainer: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
