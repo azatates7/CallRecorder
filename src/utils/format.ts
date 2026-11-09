@@ -54,6 +54,11 @@ export function formatNumber(number: string | null): string {
   return number && number.trim() ? number : 'Bilinmeyen numara';
 }
 
+/** Numara/isim olmayan sürümde satır/başlık etiketi: aramanın yönü. */
+export function directionLabel(direction: string): string {
+  return direction === 'incoming' ? 'Gelen arama' : direction === 'outgoing' ? 'Giden arama' : 'Arama';
+}
+
 /** 1_536_000 → "1,5 MB" */
 export function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;

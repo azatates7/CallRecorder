@@ -6,6 +6,8 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.media.AudioDeviceInfo
+import android.media.AudioManager
 import android.os.Build
 import android.os.IBinder
 import android.telephony.PhoneStateListener
@@ -38,6 +40,7 @@ class CallMonitorService : Service() {
 
     private var recorder: CallRecorder? = null
     private var session: Session? = null
+    private var speakerForced = false
     private val repository by lazy { RecordingRepository(this) }
     // Dosya yazma ana thread'i bloklamasın diye
     private val io: ExecutorService = Executors.newSingleThreadExecutor()
@@ -171,8 +174,8 @@ class CallMonitorService : Service() {
         val rec = CallRecorder(this, prefs.preferredSource, prefs.sampleRate)
         if (!rec.start(repository.audioFile(id))) return
         recorder = rec
-        // Yön RINGING/OFFHOOK sırasından belirlenir. Numara READ_CALL_LOG çıkarıldığı için
-        // alınmıyor (Play uyumu, CLAUDE.md §14); meta.number = null.
+        if (prefs.autoSpeaker) enableSpeaker() // karşı taraf sesi mikrofona ulaşsın (CLAUDE.md §14)
+        // Numara READ_CALL_LOG çıkarıldığı için alınmıyor (Play uyumu, §14); meta.number = null.
         session = Session(
             id = id,
             startedAt = now,
@@ -186,6 +189,7 @@ class CallMonitorService : Service() {
         val s = session ?: return
         recorder = null
         session = null
+        restoreSpeaker()
         val result = rec.stop() ?: return
         if (result.durationMs < MIN_DURATION_MS) {
             result.file.delete()
@@ -213,6 +217,44 @@ class CallMonitorService : Service() {
         }
     }
 
+
+    /** Kayıt sırasında hoparlörü açmayı dener. Her cihazda/sürümde çalışmayabilir (CLAUDE.md §14). */
+    private fun enableSpeaker() {
+        val am = getSystemService(AudioManager::class.java) ?: return
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val speaker = am.availableCommunicationDevices
+                    .firstOrNull { it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER }
+                if (speaker != null && am.setCommunicationDevice(speaker)) {
+                    speakerForced = true
+                    Log.i(TAG, "Hoparlör açıldı (kayıt için)")
+                }
+            } else {
+                @Suppress("DEPRECATION")
+                am.isSpeakerphoneOn = true
+                speakerForced = true
+                Log.i(TAG, "Hoparlör açıldı (kayıt için)")
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Hoparlör açılamadı: ${e.message}")
+        }
+    }
+
+    private fun restoreSpeaker() {
+        if (!speakerForced) return
+        speakerForced = false
+        val am = getSystemService(AudioManager::class.java) ?: return
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                am.clearCommunicationDevice()
+            } else {
+                @Suppress("DEPRECATION")
+                am.isSpeakerphoneOn = false
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Hoparlör geri alınamadı: ${e.message}")
+        }
+    }
 
     companion object {
         private const val TAG = CallRecorderModule.TAG

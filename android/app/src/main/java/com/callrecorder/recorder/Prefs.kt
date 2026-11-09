@@ -27,6 +27,11 @@ class Prefs(context: Context) {
         get() = sp.getBoolean(KEY_MONITORING, false)
         set(value) = sp.edit().putBoolean(KEY_MONITORING, value).apply()
 
+    /** Kayıt sırasında hoparlörü açmayı dene; karşı tarafın sesi mikrofona ulaşsın (CLAUDE.md §14). */
+    var autoSpeaker: Boolean
+        get() = sp.getBoolean(KEY_AUTO_SPEAKER, false)
+        set(value) = sp.edit().putBoolean(KEY_AUTO_SPEAKER, value).apply()
+
     /** İlk açılıştaki yasal bilgilendirme onaylandı mı (CLAUDE.md §13). */
     var disclaimerAccepted: Boolean
         get() = sp.getBoolean(KEY_DISCLAIMER, false)
@@ -41,5 +46,6 @@ class Prefs(context: Context) {
         private const val KEY_SAMPLE_RATE = "sampleRate"
         private const val KEY_MONITORING = "monitoringEnabled"
         private const val KEY_DISCLAIMER = "disclaimerAccepted"
+        private const val KEY_AUTO_SPEAKER = "autoSpeaker"
     }
 }

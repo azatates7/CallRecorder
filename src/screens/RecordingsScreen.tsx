@@ -1,9 +1,8 @@
 import React, { useMemo, useState } from 'react';
-import { Alert, Pressable, SectionList, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, SectionList, StyleSheet, Text, View } from 'react-native';
 import { useRecordings } from '../hooks/useRecordings';
-import { CallRecorder } from '../native/CallRecorder';
 import type { Direction, Recording } from '../types';
-import { dayKey, formatDayTitle, formatDuration, formatName, formatNumber, formatTime } from '../utils/format';
+import { dayKey, directionLabel, formatDayTitle, formatDuration, formatTime } from '../utils/format';
 import PlayerSheet from './PlayerSheet';
 
 type Filter = 'all' | Exclude<Direction, 'unknown'>;
@@ -14,17 +13,9 @@ const FILTERS: { value: Filter; label: string }[] = [
   { value: 'outgoing', label: 'Giden' },
 ];
 
-const digitsOf = (s: string) => s.replace(/\D/g, '');
-
-/** Yön filtresi + isim/numara araması. Rakamlar boşluk/tire/+ farkı gözetmeden karşılaştırılır. */
-function matches(r: Recording, filter: Filter, query: string): boolean {
-  if (filter !== 'all' && r.direction !== filter) return false;
-  const q = query.trim();
-  if (!q) return true;
-  const qDigits = digitsOf(q);
-  if (qDigits) return digitsOf(r.number ?? '').includes(qDigits);
-  const text = `${formatName(r.name)} ${formatNumber(r.number)}`.toLocaleLowerCase('tr');
-  return text.includes(q.toLocaleLowerCase('tr'));
+// Bu sürümde numara/isim yok (Play uyumu, §14), bu yüzden yalnızca yön filtresi var.
+function matchesFilter(r: Recording, filter: Filter): boolean {
+  return filter === 'all' || r.direction === filter;
 }
 
 interface Section {
@@ -53,100 +44,124 @@ function errorMessage(e: unknown): string {
 }
 
 export default function RecordingsScreen() {
-  const { recordings, loading, error, reload, remove } = useRecordings();
+  const { recordings, loading, error, reload, remove, removeMany } = useRecordings();
   const [selected, setSelected] = useState<Recording | null>(null);
   const [filter, setFilter] = useState<Filter>('all');
-  const [query, setQuery] = useState('');
-  const sections = useMemo(
-    () => groupByDay(recordings.filter(r => matches(r, filter, query))),
-    [recordings, filter, query],
-  );
-  const filtering = filter !== 'all' || query.trim() !== '';
+  // Toplu seçim modu: boş Set = mod kapalı
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const selecting = selectedIds.size > 0;
 
-  const confirmDelete = (r: Recording) => {
-    Alert.alert('Kaydı sil', `${r.name ?? formatNumber(r.number)} · ${formatTime(r.startedAt)} silinsin mi?`, [
+  const visible = useMemo(
+    () => recordings.filter(r => matchesFilter(r, filter)),
+    [recordings, filter],
+  );
+  const sections = useMemo(() => groupByDay(visible), [visible]);
+  const filtering = filter !== 'all';
+
+  const toggle = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const selectAll = () => setSelectedIds(new Set(visible.map(r => r.id)));
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const deleteSelected = () => {
+    const ids = [...selectedIds];
+    Alert.alert('Kayıtları sil', `${ids.length} kayıt silinsin mi?`, [
       { text: 'Vazgeç', style: 'cancel' },
       {
         text: 'Sil',
         style: 'destructive',
         onPress: () => {
-          remove(r.id).catch(e => Alert.alert('Silinemedi', errorMessage(e)));
+          removeMany(ids)
+            .then(clearSelection)
+            .catch(e => Alert.alert('Silinemedi', errorMessage(e)));
         },
       },
-    ]);
-  };
-
-  const showActions = (r: Recording) => {
-    Alert.alert(formatName(r.name), `${formatNumber(r.number)}\n${formatDayTitle(r.startedAt)} · ${formatTime(r.startedAt)}`, [
-      {
-        text: 'Paylaş',
-        onPress: () => {
-          CallRecorder.shareRecording(r.id).catch(e => Alert.alert('Paylaşılamadı', errorMessage(e)));
-        },
-      },
-      { text: 'Sil', style: 'destructive', onPress: () => confirmDelete(r) },
-      { text: 'Vazgeç', style: 'cancel' },
     ]);
   };
 
   return (
     <View style={styles.container}>
       {error ? <Text style={styles.error}>{error}</Text> : null}
-      <View style={styles.toolbar}>
-        <TextInput
-          style={styles.search}
-          value={query}
-          onChangeText={setQuery}
-          placeholder="İsim veya numara ara"
-          placeholderTextColor="#999"
-          autoCorrect={false}
-          clearButtonMode="while-editing"
-        />
-        <View style={styles.filters}>
-          {FILTERS.map(f => (
-            <Pressable
-              key={f.value}
-              style={[styles.filter, filter === f.value && styles.filterActive]}
-              onPress={() => setFilter(f.value)}>
-              <Text style={[styles.filterText, filter === f.value && styles.filterTextActive]}>{f.label}</Text>
-            </Pressable>
-          ))}
+
+      {selecting ? (
+        <View style={styles.selbar}>
+          <Pressable style={styles.selIcon} onPress={clearSelection}>
+            <Text style={styles.selIconText}>✕</Text>
+          </Pressable>
+          <Text style={styles.selCount}>{selectedIds.size} seçildi</Text>
+          <Pressable style={styles.selAction} onPress={selectAll}>
+            <Text style={styles.selActionText}>Tümünü seç</Text>
+          </Pressable>
+          <Pressable style={styles.selAction} onPress={deleteSelected}>
+            <Text style={[styles.selActionText, styles.selDelete]}>Sil</Text>
+          </Pressable>
         </View>
-      </View>
+      ) : (
+        <View style={styles.toolbar}>
+          <View style={styles.filters}>
+            {FILTERS.map(f => (
+              <Pressable
+                key={f.value}
+                style={[styles.filter, filter === f.value && styles.filterActive]}
+                onPress={() => setFilter(f.value)}>
+                <Text style={[styles.filterText, filter === f.value && styles.filterTextActive]}>{f.label}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      )}
+
       <SectionList
         sections={sections}
         keyExtractor={item => item.id}
         refreshing={loading}
-        onRefresh={reload}
+        onRefresh={selecting ? undefined : reload}
         renderSectionHeader={({ section }) => <Text style={styles.header}>{section.title}</Text>}
-        renderItem={({ item }) => (
-          <Pressable
-            style={styles.row}
-            onPress={() => setSelected(item)}
-            onLongPress={() => showActions(item)}>
-            <Text
-              style={[styles.icon, item.direction === 'incoming' ? styles.incoming : styles.outgoing]}>
-              {item.direction === 'incoming' ? '↙' : item.direction === 'outgoing' ? '↗' : '•'}
-            </Text>
-            <View style={styles.rowText}>
-              <Text style={[styles.name, !item.name && styles.unknown]}>{formatName(item.name)}</Text>
-              <Text style={styles.meta}>
-                {formatNumber(item.number)} · {formatTime(item.startedAt)}
-              </Text>
-            </View>
-            <Text style={styles.duration}>{formatDuration(item.durationMs)}</Text>
-          </Pressable>
-        )}
+        renderItem={({ item }) => {
+          const checked = selectedIds.has(item.id);
+          return (
+            <Pressable
+              style={[styles.row, checked && styles.rowChecked]}
+              onPress={() => (selecting ? toggle(item.id) : setSelected(item))}
+              onLongPress={() => toggle(item.id)}>
+              {selecting ? (
+                <Text style={[styles.icon, styles.check]}>{checked ? '☑' : '☐'}</Text>
+              ) : (
+                <Text
+                  style={[styles.icon, item.direction === 'incoming' ? styles.incoming : styles.outgoing]}>
+                  {item.direction === 'incoming' ? '↙' : item.direction === 'outgoing' ? '↗' : '•'}
+                </Text>
+              )}
+              <View style={styles.rowText}>
+                <Text style={styles.name}>{directionLabel(item.direction)}</Text>
+                <Text style={styles.meta}>{formatTime(item.startedAt)}</Text>
+              </View>
+              <Text style={styles.duration}>{formatDuration(item.durationMs)}</Text>
+            </Pressable>
+          );
+        }}
         ListEmptyComponent={
           loading ? undefined : (
             <Text style={styles.empty}>
-              {filtering ? 'Eşleşen kayıt yok.' : 'Henüz kayıt yok. Durum ekranındaki adımları tamamlayın.'}
+              {filtering ? 'Bu yönde kayıt yok.' : 'Henüz kayıt yok. Durum ekranındaki adımları tamamlayın.'}
             </Text>
           )
         }
         contentContainerStyle={sections.length === 0 ? styles.emptyContainer : undefined}
       />
-      <PlayerSheet recording={selected} onClose={() => setSelected(null)} />
+
+      <PlayerSheet
+        recording={selecting ? null : selected}
+        onClose={() => setSelected(null)}
+        onDelete={id => remove(id).catch(e => Alert.alert('Silinemedi', errorMessage(e)))}
+      />
     </View>
   );
 }
@@ -155,16 +170,7 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   error: { color: '#c62828', padding: 16 },
   toolbar: { padding: 12, backgroundColor: '#fff', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#ddd' },
-  search: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    fontSize: 16,
-    color: '#111',
-  },
-  filters: { flexDirection: 'row', marginTop: 8 },
+  filters: { flexDirection: 'row' },
   filter: {
     paddingHorizontal: 14,
     paddingVertical: 6,
@@ -176,6 +182,19 @@ const styles = StyleSheet.create({
   filterActive: { backgroundColor: '#1976d2', borderColor: '#1976d2' },
   filterText: { fontSize: 14, color: '#111' },
   filterTextActive: { color: '#fff' },
+  selbar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: '#1976d2',
+  },
+  selIcon: { paddingHorizontal: 8, paddingVertical: 4 },
+  selIconText: { color: '#fff', fontSize: 18 },
+  selCount: { flex: 1, color: '#fff', fontSize: 16, fontWeight: '600', marginLeft: 8 },
+  selAction: { paddingHorizontal: 10, paddingVertical: 4 },
+  selActionText: { color: '#fff', fontSize: 15 },
+  selDelete: { fontWeight: '700' },
   header: {
     fontSize: 13,
     fontWeight: '600',
@@ -193,12 +212,13 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#ddd',
   },
+  rowChecked: { backgroundColor: '#e3f2fd' },
   icon: { fontSize: 20, width: 28 },
+  check: { color: '#1976d2' },
   incoming: { color: '#2e7d32' },
   outgoing: { color: '#1976d2' },
   rowText: { flex: 1 },
   name: { fontSize: 16, color: '#111' },
-  unknown: { color: '#777', fontStyle: 'italic' },
   meta: { fontSize: 13, color: '#666', marginTop: 2 },
   duration: { fontSize: 14, color: '#444', fontVariant: ['tabular-nums'] },
   emptyContainer: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },

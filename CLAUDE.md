@@ -2,7 +2,7 @@
 
 Bu dosya, projeyi sıfırdan kuracak ve geliştirecek Claude Code oturumları için tek referanstır. Kararlar burada; bir kararı değiştirmeden önce gerekçesini yaz ve bu dosyayı güncelle.
 
-> **DİKKAT — mevcut durum:** Uygulama şu an **Play uyumlu, sade sürüm**. Erişilebilirlik servisi, `READ_CALL_LOG` ve kişi adları (`READ_CONTACTS`) **çıkarıldı**. §2.3, §2.6, §6, §7, §8, §9-Faz3/4 bu özellikleri anlatır ama **artık kodda yoklar**. Neyin neden çıkarıldığı ve nasıl geri getirileceği **§14'te**. Sideload (kişisel kullanım) için bu üçünü geri eklemek gerekebilir.
+> **DİKKAT — mevcut durum:** Uygulama şu an **Play uyumlu, sade sürüm**. Erişilebilirlik servisi, `READ_CALL_LOG` ve kişi adları (`READ_CONTACTS`) **çıkarıldı** → kayıtlarda numara/isim yok; listede "Gelen arama"/"Giden arama" + saat gösterilir. Android 10+'da ses için hoparlör (`autoSpeaker`) gerekir. Kayıtlar ekranında yön filtresi + toplu/seçili silme var. Numara/isim istenirse §14'teki yolla geri eklenir ama Play uyumu bozulur.
 
 ## 1. Amaç ve kapsam
 
@@ -272,5 +272,7 @@ Bu bölüm, uygulamanın Google Play politikalarına uyması için tek sürümde
 1. `READ_CALL_LOG`: `CallLogResolver.kt`'yi geri ekle, manifest'e izni ekle, `CallMonitorService.stopRecording`'de `callLogResolver.resolve(...)` ile numara/yönü doldur (git'teki eski sürüm), `STATUS_PERMISSIONS` ve `PERMISSION_ROWS`'a `READ_CALL_LOG` ekle, `PermissionKey`'e geri koy.
 2. `READ_CONTACTS` + isim: `ContactNameResolver.kt`'yi geri ekle, manifest izni, `toMap`'te `names.nameFor(...)` ile `name` doldur, listRecordings/savedListener'da `ContactNameResolver` örneğini geç, izin satırı + `PermissionKey`.
 3. Erişilebilirlik: `KeepAliveAccessibilityService.kt` + `res/xml/accessibility_service.xml` + `strings.xml` metinleri + manifest `<service>` geri; `getStatus`'a `accessibilityEnabled`, modüle `openAccessibilitySettings`, `ServiceStatus`'a alan, Durum ekranına CheckRow + "Kısıtlı ayarlar" notu geri.
+
+**Play sürümü iyileştirmesi — hoparlör (`autoSpeaker`):** Erişilebilirlik servisi olmadan Android 10+'da karşı tarafın sesini yakalamanın Play-uyumlu tek yolu hoparlör; ses hoparlörden mikrofona fiziksel olarak ulaşır. `Prefs.autoSpeaker` (varsayılan kapalı) açıkken servis kayıt başlarken hoparlörü açmayı dener (API 31+ `setCommunicationDevice`, altı `setSpeakerphoneOn`) ve kayıt bitince geri alır; `MODIFY_AUDIO_SETTINGS` izni eklendi (normal izin, Play sorunsuz). Her cihazda/sürümde çalışmayabilir; garanti değil. Aramayı hoparlöre aldığı için varsayılan kapalı, kullanıcı Durum ekranından açar.
 
 **Play yayını için kalan adımlar (sade sürümle):** `assembleRelease` yerine **AAB**: `.\gradlew bundleRelease` → `android/app/build/outputs/bundle/release/app-release.aab`. Play Console (25 USD, tek sefer), Play App Signing, store listesi, veri güvenliği formu, içerik derecelendirmesi, mikrofon ön plan servisi türü için beyan+gerekçe. `RECORD_AUDIO` + mikrofon FGS gerekçeli olarak kabul edilir.

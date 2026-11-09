@@ -1,14 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { Alert, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { usePlayer } from '../hooks/usePlayer';
+import { CallRecorder } from '../native/CallRecorder';
 import type { Recording } from '../types';
-import { formatDayTitle, formatDuration, formatName, formatNumber, formatTime } from '../utils/format';
+import { directionLabel, formatDayTitle, formatDuration, formatTime } from '../utils/format';
 
 const SKIP_MS = 10_000;
 
 interface Props {
   recording: Recording | null;
   onClose: () => void;
+  onDelete: (id: string) => void;
 }
 
 function showError(e: unknown) {
@@ -16,7 +18,7 @@ function showError(e: unknown) {
 }
 
 /** Alt panel oynatıcı. Açılınca kaydı çalmaya başlar, kapanınca durdurur. */
-export default function PlayerSheet({ recording, onClose }: Props) {
+export default function PlayerSheet({ recording, onClose, onDelete }: Props) {
   const { state, play, pause, seekTo, stop } = usePlayer();
   const [barWidth, setBarWidth] = useState(0);
 
@@ -44,14 +46,26 @@ export default function PlayerSheet({ recording, onClose }: Props) {
     (state.playing ? pause() : play(recording.id)).catch(showError);
   };
 
+  const share = () => {
+    CallRecorder.shareRecording(recording.id).catch(e =>
+      Alert.alert('Paylaşılamadı', e instanceof Error ? e.message : String(e)),
+    );
+  };
+
+  const confirmDelete = () => {
+    Alert.alert('Kaydı sil', 'Bu kayıt silinsin mi?', [
+      { text: 'Vazgeç', style: 'cancel' },
+      { text: 'Sil', style: 'destructive', onPress: () => { onDelete(recording.id); onClose(); } },
+    ]);
+  };
+
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose} />
       <View style={styles.sheet}>
-        <Text style={styles.title}>{formatName(recording.name)}</Text>
+        <Text style={styles.title}>{directionLabel(recording.direction)}</Text>
         <Text style={styles.subtitle}>
-          {formatNumber(recording.number)} · {formatDayTitle(recording.startedAt)} ·{' '}
-          {formatTime(recording.startedAt)}
+          {formatDayTitle(recording.startedAt)} · {formatTime(recording.startedAt)}
         </Text>
 
         <Pressable
@@ -78,6 +92,15 @@ export default function PlayerSheet({ recording, onClose }: Props) {
           </Pressable>
           <Pressable style={styles.button} onPress={() => seekBy(SKIP_MS)}>
             <Text style={styles.buttonText}>+10 sn</Text>
+          </Pressable>
+        </View>
+
+        <View style={styles.secondary}>
+          <Pressable style={styles.secondaryBtn} onPress={share}>
+            <Text style={styles.secondaryText}>Paylaş</Text>
+          </Pressable>
+          <Pressable style={styles.secondaryBtn} onPress={confirmDelete}>
+            <Text style={[styles.secondaryText, styles.deleteText]}>Sil</Text>
           </Pressable>
         </View>
 
@@ -121,6 +144,10 @@ const styles = StyleSheet.create({
   buttonText: { fontSize: 16, color: '#111' },
   primary: { backgroundColor: '#1976d2' },
   primaryText: { color: '#fff', fontWeight: '600' },
-  close: { alignItems: 'center', marginTop: 16, paddingVertical: 8 },
+  secondary: { flexDirection: 'row', justifyContent: 'center', marginTop: 16 },
+  secondaryBtn: { paddingVertical: 8, paddingHorizontal: 24 },
+  secondaryText: { fontSize: 15, color: '#1976d2' },
+  deleteText: { color: '#c62828' },
+  close: { alignItems: 'center', marginTop: 8, paddingVertical: 8 },
   closeText: { fontSize: 15, color: '#1976d2' },
 });

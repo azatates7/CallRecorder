@@ -43,5 +43,11 @@ export function useRecordings() {
     setRecordings(list => list.filter(r => r.id !== id));
   }, []);
 
-  return { recordings, loading, error, reload, remove };
+  const removeMany = useCallback(async (ids: string[]) => {
+    await Promise.all(ids.map(id => CallRecorder.deleteRecording(id)));
+    const set = new Set(ids);
+    setRecordings(list => list.filter(r => !set.has(r.id)));
+  }, []);
+
+  return { recordings, loading, error, reload, remove, removeMany };
 }

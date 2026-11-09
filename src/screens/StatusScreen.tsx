@@ -156,6 +156,16 @@ export default function StatusScreen() {
         </View>
         <Switch value={settings.autoRecord} onValueChange={v => run(() => updateSettings({ autoRecord: v }))} />
       </View>
+      <View style={styles.switchRow}>
+        <View style={styles.flex}>
+          <Text style={styles.checkTitle}>Kayıt sırasında hoparlörü aç</Text>
+          <Text style={styles.hint}>
+            Karşı tarafın sesinin de kaydedilmesine yardımcı olur. Aramayı hoparlöre alır (herkes
+            duyabilir) ve her cihazda çalışmayabilir.
+          </Text>
+        </View>
+        <Switch value={settings.autoSpeaker} onValueChange={v => run(() => updateSettings({ autoSpeaker: v }))} />
+      </View>
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
       <Text style={styles.label}>Ses kaynağı</Text>
@@ -183,8 +193,10 @@ export default function StatusScreen() {
       <Text style={styles.body}>
         Android, uygulamaların hat sesini doğrudan kaydetmesine izin vermez; kayıt telefonun mikrofonundan
         alınır. Kendi sesiniz her zaman net kaydedilir, karşı tarafın sesi en iyi hoparlör açıkken duyulur.
-        Kulaklık veya Bluetooth kullanılırken karşı tarafın sesi kayda girmeyebilir. Görüşme kaydı yalnızca
-        kişisel kullanım içindir; karşı tarafı bilgilendirmek sizin sorumluluğunuzdadır.
+        Kulaklık veya Bluetooth kullanılırken karşı tarafın sesi kayda girmeyebilir. En iyi sonuç için
+        yukarıdaki "Kayıt sırasında hoparlörü aç" ayarını kullanın veya aramayı elle hoparlöre alın.
+        Görüşme kaydı yalnızca kişisel kullanım içindir; karşı tarafı bilgilendirmek sizin
+        sorumluluğunuzdadır.
       </Text>
     </ScrollView>
   );

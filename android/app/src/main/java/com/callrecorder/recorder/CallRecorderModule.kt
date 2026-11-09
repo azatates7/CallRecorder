@@ -164,6 +164,7 @@ class CallRecorderModule(reactContext: ReactApplicationContext) :
             if (source != null) prefs.preferredSource = source
             if (rate != null) prefs.sampleRate = rate
             if (settings.hasKey("disclaimerAccepted")) prefs.disclaimerAccepted = settings.getBoolean("disclaimerAccepted")
+            if (settings.hasKey("autoSpeaker")) prefs.autoSpeaker = settings.getBoolean("autoSpeaker")
             promise.resolve(settingsMap())
         } catch (e: Exception) {
             promise.reject("E_IO", e.message, e)
@@ -269,6 +270,7 @@ class CallRecorderModule(reactContext: ReactApplicationContext) :
         putString("preferredSource", prefs.preferredSource)
         putInt("sampleRate", prefs.sampleRate)
         putBoolean("disclaimerAccepted", prefs.disclaimerAccepted)
+        putBoolean("autoSpeaker", prefs.autoSpeaker)
     }
 
     private fun settle(promise: Promise, error: Throwable?) {
@@ -283,8 +285,8 @@ class CallRecorderModule(reactContext: ReactApplicationContext) :
     private fun toMap(meta: RecordingMeta): WritableMap = Arguments.createMap().apply {
         putString("id", meta.id)
         putString("filePath", repository.audioFile(meta.id).absolutePath)
-        if (meta.number != null) putString("number", meta.number) else putNull("number")
-        putNull("name") // READ_CONTACTS çıkarıldı (Play uyumu, CLAUDE.md §14)
+        putNull("number") // READ_CALL_LOG çıkarıldı (Play uyumu, CLAUDE.md §14)
+        putNull("name")
         putString("direction", meta.direction)
         putDouble("startedAt", meta.startedAt.toDouble())
         putDouble("durationMs", meta.durationMs.toDouble())

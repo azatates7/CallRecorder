@@ -8,7 +8,7 @@ export interface Recording {
   id: string;
   filePath: string;
   number: string | null;
-  /** Rehberdeki kişi adı. Bu sürümde READ_CONTACTS çıkarıldığı için her zaman null (CLAUDE.md §14). */
+  /** Bu sürümde READ_CONTACTS çıkarıldığı için her zaman null (CLAUDE.md §14). */
   name: string | null;
   direction: Direction;
   startedAt: number; // epoch ms
@@ -39,6 +39,8 @@ export interface RecorderSettings {
   autoRecord: boolean;
   preferredSource: AudioSourceName | 'AUTO';
   sampleRate: SampleRate;
+  /** Kayıt sırasında hoparlörü açmayı dene (CLAUDE.md §14). */
+  autoSpeaker: boolean;
   /** İlk açılıştaki yasal bilgilendirme onaylandı mı (CLAUDE.md §13). */
   disclaimerAccepted: boolean;
 }
