@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CallRecorder — Gizlilik Politikası</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body {
+      font-family: -apple-system, system-ui, "Segoe UI", Roboto, sans-serif;
+      line-height: 1.6;
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 32px 20px 64px;
+      color: #1a1a1a;
+      background: #fff;
+    }
+    @media (prefers-color-scheme: dark) {
+      body { color: #e6e6e6; background: #121212; }
+      a { color: #6ea8fe; }
+    }
+    h1 { font-size: 1.6rem; }
+    h2 { font-size: 1.15rem; margin-top: 2rem; }
+    .meta { color: #777; font-size: 0.9rem; }
+    ul { padding-left: 1.2rem; }
+  </style>
+</head>
+<body>
+  <h1>CallRecorder — Gizlilik Politikası</h1>
+  <p class="meta">Son güncelleme: Kasım 2026</p>
+
+  <p>
+    CallRecorder ("uygulama"), telefon görüşmelerinizi yalnızca kendi cihazınıza kaydeden,
+    tamamen çevrimdışı çalışan bir Android uygulamasıdır. Bu politika, uygulamanın hangi
+    verilere eriştiğini ve bu verilerin ne olduğunu açıklar.
+  </p>
+
+  <h2>Veri toplamıyoruz</h2>
+  <p>
+    Uygulama internete bağlanmaz. Yayınlanan sürümde internet izni (<code>INTERNET</code>)
+    bulunmaz. Ses kayıtlarınız, kayıt bilgileri (aramanın yönü, tarihi, süresi) ve ayarlarınız
+    <strong>yalnızca telefonunuzda</strong> saklanır. Bu veriler hiçbir sunucuya, geliştiriciye
+    veya üçüncü tarafa gönderilmez. Uygulamada reklam, analiz (analytics) veya izleme aracı yoktur.
+  </p>
+
+  <h2>Kullanılan izinler ve nedenleri</h2>
+  <ul>
+    <li><strong>Mikrofon (RECORD_AUDIO):</strong> Arama sesini telefonun mikrofonundan kaydetmek için.</li>
+    <li><strong>Telefon durumu (READ_PHONE_STATE):</strong> Bir aramanın ne zaman başlayıp bittiğini anlamak için.</li>
+    <li><strong>Bildirim (POST_NOTIFICATIONS):</strong> Kaydın çalıştığını gösteren kalıcı bildirimi göstermek için.</li>
+    <li><strong>Ön plan servisi / mikrofon (FOREGROUND_SERVICE, FOREGROUND_SERVICE_MICROPHONE):</strong> Arama sırasında kaydın arka planda sürmesi için.</li>
+    <li><strong>Açılışta çalıştırma (RECEIVE_BOOT_COMPLETED):</strong> Telefon yeniden başladığında, açık bıraktıysanız kayıt izlemeyi geri başlatmak için.</li>
+    <li><strong>Pil optimizasyonu (REQUEST_IGNORE_BATTERY_OPTIMIZATIONS):</strong> Sistemin kayıt servisini arka planda kapatmaması için (isteğe bağlı).</li>
+  </ul>
+
+  <h2>Kayıtların saklanması</h2>
+  <p>
+    Kayıtlar, uygulamanın cihazdaki kendi özel klasöründe tutulur. Uygulamayı sildiğinizde veya
+    bir kaydı uygulama içinden sildiğinizde, o kayıtlar da kalıcı olarak silinir. Kayıtlarınızı
+    dilediğinizde Android'in paylaşma menüsü üzerinden kendiniz başka bir uygulamaya aktarabilirsiniz;
+    bu işlem yalnızca sizin başlattığınızda gerçekleşir.
+  </p>
+
+  <h2>Sorumluluğunuz</h2>
+  <p>
+    Türkiye'de ve birçok ülkede, bir görüşmenin karşı tarafın bilgisi olmadan kaydedilmesi yasal
+    sonuçlar doğurabilir (Türkiye'de KVKK ve Türk Ceza Kanunu kapsamında). Kayıtları yalnızca
+    kişisel amaçla kullanmak ve görüşme yaptığınız kişiyi kayıt konusunda bilgilendirmek
+    kullanıcının sorumluluğundadır.
+  </p>
+
+  <h2>Çocuklar</h2>
+  <p>Uygulama çocuklara yönelik değildir ve çocuklardan bilerek veri toplamaz.</p>
+
+  <h2>Değişiklikler</h2>
+  <p>
+    Bu politika güncellenirse, güncel sürüm bu sayfada yayımlanır ve yukarıdaki "Son güncelleme"
+    tarihi değiştirilir.
+  </p>
+
+  <h2>İletişim</h2>
+  <p>Sorularınız için: [e-posta adresin]</p>
+</body>
+</html>
