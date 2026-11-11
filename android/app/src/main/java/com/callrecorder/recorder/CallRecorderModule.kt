@@ -98,6 +98,7 @@ class CallRecorderModule(reactContext: ReactApplicationContext) :
             promise.resolve(
                 Arguments.createMap().apply {
                     putBoolean("monitoring", CallMonitorService.isRunning)
+                    putBoolean("accessibilityEnabled", KeepAliveAccessibilityService.isEnabled(ctx))
                     putBoolean("ignoringBatteryOptimizations", power.isIgnoringBatteryOptimizations(ctx.packageName))
                     putMap("permissions", permissions)
                 },
@@ -105,6 +106,11 @@ class CallRecorderModule(reactContext: ReactApplicationContext) :
         } catch (e: Exception) {
             promise.reject("E_SERVICE", e.message, e)
         }
+    }
+
+    @ReactMethod
+    fun openAccessibilitySettings(promise: Promise) {
+        launch(promise, Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
     }
 
     /** Kalıcı reddedilen izinler ve Android 13+ "kısıtlı ayarlar" için uygulama bilgisi ekranı. */

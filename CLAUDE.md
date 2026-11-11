@@ -2,7 +2,7 @@
 
 Bu dosya, projeyi sıfırdan kuracak ve geliştirecek Claude Code oturumları için tek referanstır. Kararlar burada; bir kararı değiştirmeden önce gerekçesini yaz ve bu dosyayı güncelle.
 
-> **DİKKAT — mevcut durum:** Uygulama şu an **Play uyumlu, sade sürüm**. Erişilebilirlik servisi, `READ_CALL_LOG` ve kişi adları (`READ_CONTACTS`) **çıkarıldı** → kayıtlarda numara/isim yok; listede "Gelen arama"/"Giden arama" + saat gösterilir. Android 10+'da ses için hoparlör (`autoSpeaker`) gerekir. Kayıtlar ekranında yön filtresi + toplu/seçili silme var. Numara/isim istenirse §14'teki yolla geri eklenir ama Play uyumu bozulur.
+> **DİKKAT — mevcut durum:** Uygulama şu an **kişisel/sideload sürüm**. **Erişilebilirlik servisi geri getirildi** (Android 10+'da aramada mikrofonun susturulmaması için) → bu yüzden **Play uyumlu DEĞİL** (Play erişilebilirlikle arama kaydını yasaklar); yalnızca APK ile kurulur. `READ_CALL_LOG`/`READ_CONTACTS` hâlâ yok → numara/isim gösterilmez, listede "Gelen/Giden arama" + saat. Kullanıcı erişilebilirlik servisini Ayarlar › Erişilebilirlik'ten elle açmalı. Toplu/seçili silme ve `autoSpeaker` duruyor. Numara/isim de istenirse §14'teki yolla eklenir.
 
 ## 1. Amaç ve kapsam
 
@@ -163,7 +163,7 @@ play(id: string): Promise<void>; pause(): Promise<void>; seekTo(ms: number): Pro
 - `RECEIVE_BOOT_COMPLETED`
 - `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`
 - `<service android:foregroundServiceType="microphone">`
-- ~~AccessibilityService~~ → Play uyumu için çıkarıldı (§14).
+- AccessibilityService: `BIND_ACCESSIBILITY_SERVICE` ile; `accessibility_service.xml` olay işlemez. **Geri getirildi — Play uyumlu değil** (§14).
 - **`INTERNET` ana manifest'te yok.** Yalnızca debug'da Metro bağlantısı için `android/app/src/debug/AndroidManifest.xml`'de tanımlı; release APK'da bulunmaz.
 
 İzin isteme sırası (Durum ekranında adım adım): Mikrofon → Telefon durumu → Bildirim → Pil optimizasyonu. (Arama kaydı, Kişiler ve Erişilebilirlik bu sürümde yok — §14.)

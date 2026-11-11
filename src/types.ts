@@ -29,6 +29,7 @@ export type PermissionKey = 'RECORD_AUDIO' | 'READ_PHONE_STATE' | 'POST_NOTIFICA
 
 export interface ServiceStatus {
   monitoring: boolean;
+  accessibilityEnabled: boolean;
   ignoringBatteryOptimizations: boolean;
   permissions: Record<PermissionKey, 'granted' | 'denied'>;
 }

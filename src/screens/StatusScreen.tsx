@@ -134,6 +134,19 @@ export default function StatusScreen() {
         actionLabel="Düzelt"
         onAction={() => run(CallRecorder.requestIgnoreBatteryOptimizations)}
       />
+      <CheckRow
+        ok={status.accessibilityEnabled}
+        title="Erişilebilirlik servisi"
+        why="Android 10+'da arama sırasında mikrofonun kapatılmaması için. Ekranı okumaz."
+        actionLabel="Aç"
+        onAction={() => run(CallRecorder.openAccessibilitySettings)}
+      />
+      {!status.accessibilityEnabled ? (
+        <Text style={styles.note}>
+          Anahtar gri ve açılamıyorsa: Ayarlar › Uygulamalar › CallRecorder › sağ üstteki ⋮ › "Kısıtlı
+          ayarlara izin ver" seçeneğini açıp tekrar deneyin.
+        </Text>
+      ) : null}
 
       <Text style={styles.section}>Kayıt</Text>
       <View style={styles.switchRow}>
@@ -210,6 +223,7 @@ const styles = StyleSheet.create({
   checkMark: { fontSize: 18, width: 28, fontWeight: '700' },
   checkTitle: { fontSize: 16, color: '#111' },
   hint: { fontSize: 13, color: '#666', marginTop: 2 },
+  note: { fontSize: 13, color: '#8a5a00', marginLeft: 28, marginBottom: 4 },
   action: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6, backgroundColor: '#1976d2' },
   actionText: { color: '#fff', fontWeight: '600' },
   switchRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8 },
